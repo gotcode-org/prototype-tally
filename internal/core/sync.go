@@ -796,7 +796,88 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 	orgName := extractOrgName(cfg.ADO.Organization)
 
 	if t.ADOID == nil {
-		logf(logChan, "Task %s is not linked to ADO (no ADOID). Ignoring push.\n", t.ID)
+		logf(logChan, "Syncing new task %s to ADO...\n", t.ID)
+		
+		adoType := t.ADOType
+		if adoType == "" {
+			adoType = "Task"
+		}
+
+		patch := []map[string]interface{}{
+			{"op": "add", "path": "/fields/System.Title", "value": t.Title},
+			{"op": "add", "path": "/fields/System.AreaPath", "value": cfg.ADO.DefaultArea},
+		}
+		
+		if cfg.User.Email != "" {
+			patch = append(patch, map[string]interface{}{
+				"op": "add", "path": "/fields/System.AssignedTo", "value": cfg.User.Email,
+			})
+		}
+		
+		if t.Body != "" {
+			desc, ac := parseMarkdownSections(t.Body)
+			if desc != "" {
+				patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/System.Description", "value": desc})
+			}
+			if ac != "" {
+				patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/Microsoft.VSTS.Common.AcceptanceCriteria", "value": ac})
+			}
+		}
+		
+		if len(t.Tags) > 0 {
+			patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/System.Tags", "value": strings.Join(t.Tags, "; ")})
+		}
+		
+		if t.Swimlane != "" && cfg.ADO.SwimlaneField != "" {
+			patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/" + cfg.ADO.SwimlaneField, "value": t.Swimlane})
+		}
+		
+		if t.StoryPoints != nil {
+			patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/Microsoft.VSTS.Scheduling.StoryPoints", "value": *t.StoryPoints})
+		}
+		
+		if t.ParentID != "" {
+			parentTask, err := a.Store.Load(t.ParentID)
+			if err == nil && parentTask.ADOID != nil {
+				patch = append(patch, map[string]interface{}{
+					"op": "add",
+					"path": "/relations/-",
+					"value": map[string]interface{}{
+						"rel": "System.LinkTypes.Hierarchy-Reverse",
+						"url": fmt.Sprintf("%s/_apis/wit/workitems/%d", strings.TrimRight(cfg.ADO.Organization, "/"), *parentTask.ADOID),
+						"attributes": map[string]interface{}{"comment": "Linked via Tally"},
+					},
+				})
+			}
+		}
+
+		payload, _ := json.Marshal(patch)
+		url := fmt.Sprintf("%s/%s/_apis/wit/workitems/$%s?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, strings.ReplaceAll(adoType, " ", "%20"))
+		
+		req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+		req.Header.Set("Content-Type", "application/json-patch+json")
+		req.SetBasicAuth("", adoPat)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("network error hitting ADO: %w", err)
+		}
+		
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			var adoResp ADOResponse
+			body, _ := io.ReadAll(resp.Body)
+			json.Unmarshal(body, &adoResp)
+			resp.Body.Close()
+			
+			t.ADOID = &adoResp.ID
+			t.UpdatedAt = time.Now()
+			a.Store.Save(t)
+			logf(logChan, "  -> Successfully created ADO Work Item #%d\n", *t.ADOID)
+		} else {
+			resp.Body.Close()
+			logf(logChan, "  -> Failed to create ADO Work Item: HTTP %d\n", resp.StatusCode)
+			return nil, fmt.Errorf("failed to create: HTTP %d", resp.StatusCode)
+		}
 	} else {
 		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, *t.ADOID)
 		
