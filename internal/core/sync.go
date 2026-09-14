@@ -881,8 +881,23 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 	} else {
 		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, *t.ADOID)
 		
+		latestRev := t.ADORev
+		revUrl := fmt.Sprintf("%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), *t.ADOID)
+		reqRev, _ := http.NewRequest("GET", revUrl, nil)
+		reqRev.SetBasicAuth("", adoPat)
+		if respRev, err := client.Do(reqRev); err == nil && respRev.StatusCode == 200 {
+			var revData struct {
+				Rev int `json:"rev"`
+			}
+			bodyRev, _ := io.ReadAll(respRev.Body)
+			if json.Unmarshal(bodyRev, &revData) == nil && revData.Rev > 0 {
+				latestRev = revData.Rev
+			}
+			respRev.Body.Close()
+		}
+
 		patch := []map[string]interface{}{}
-		if t.ADORev > 0 {
+		if latestRev > 0 {
 			patch = append(patch, map[string]interface{}{
 				"op": "test", "path": "/rev", "value": t.ADORev,
 			})
