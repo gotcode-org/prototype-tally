@@ -882,11 +882,11 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, *t.ADOID)
 		
 		patch := []map[string]interface{}{}
-		if t.ADORev > 0 {
-			patch = append(patch, map[string]interface{}{
-				"op": "test", "path": "/rev", "value": t.ADORev,
-			})
-		}
+//		if t.ADORev > 0 {
+//			patch = append(patch, map[string]interface{}{
+//				"op": "test", "path": "/rev", "value": t.ADORev,
+//			})
+//		}
 		patch = append(patch,
 			map[string]interface{}{"op": "add", "path": "/fields/System.Title", "value": t.Title},
 			map[string]interface{}{"op": "add", "path": "/fields/System.State", "value": string(t.Status)},
