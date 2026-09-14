@@ -882,16 +882,21 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, *t.ADOID)
 		
 		latestRev := t.ADORev
-		revUrl := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
+		remoteState := ""
+		revUrl := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev,System.State&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
 		reqRev, _ := http.NewRequest("GET", revUrl, nil)
 		reqRev.SetBasicAuth("", adoPat)
 		if respRev, err := client.Do(reqRev); err == nil && respRev.StatusCode == 200 {
 			var revData struct {
 				Rev int `json:"rev"`
+				Fields map[string]interface{} `json:"fields"`
 			}
 			bodyRev, _ := io.ReadAll(respRev.Body)
 			if json.Unmarshal(bodyRev, &revData) == nil && revData.Rev > 0 {
 				latestRev = revData.Rev
+				if val, ok := revData.Fields["System.State"].(string); ok {
+					remoteState = val
+				}
 			}
 			respRev.Body.Close()
 		}
@@ -902,10 +907,10 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 				"op": "test", "path": "/rev", "value": latestRev,
 			})
 		}
-		patch = append(patch,
-			map[string]interface{}{"op": "add", "path": "/fields/System.Title", "value": t.Title},
-			map[string]interface{}{"op": "add", "path": "/fields/System.State", "value": string(t.Status)},
-		)
+		patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/System.Title", "value": t.Title})
+		if remoteState == "" || string(t.Status) != remoteState {
+			patch = append(patch, map[string]interface{}{"op": "add", "path": "/fields/System.State", "value": string(t.Status)})
+		}
 		
 		if t.Body != "" {
 			desc, ac := parseMarkdownSections(t.Body)
