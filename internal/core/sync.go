@@ -899,7 +899,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		patch := []map[string]interface{}{}
 		if latestRev > 0 {
 			patch = append(patch, map[string]interface{}{
-				"op": "test", "path": "/rev", "value": t.ADORev,
+				"op": "test", "path": "/rev", "value": latestRev,
 			})
 		}
 		patch = append(patch,
