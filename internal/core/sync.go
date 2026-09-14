@@ -1002,8 +1002,44 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 						return []*Task{newTask}, nil
 					}
 				}
+				if strings.Contains(bodyStr, "not in the list of supported values") || strings.Contains(bodyStr, "TF401346") {
+					logf(logChan, "  -> ADO rejected State transition. Retrying without State field...\n")
+					
+					fallbackPatch := []map[string]interface{}{}
+					for _, p := range patch {
+						if p["path"] != "/fields/System.State" {
+							fallbackPatch = append(fallbackPatch, p)
+						}
+					}
+					
+					fbPayload, _ := json.Marshal(fallbackPatch)
+					reqFB, _ := http.NewRequest("PATCH", url, bytes.NewBuffer(fbPayload))
+					reqFB.Header.Set("Content-Type", "application/json-patch+json")
+					reqFB.SetBasicAuth("", adoPat)
+					
+					respFB, errFB := client.Do(reqFB)
+					if errFB == nil && respFB.StatusCode >= 200 && respFB.StatusCode < 300 {
+						var updateResp struct {
+							Rev int `json:"rev"`
+						}
+						fbBody, _ := io.ReadAll(respFB.Body)
+						if json.Unmarshal(fbBody, &updateResp) == nil && updateResp.Rev > 0 {
+							t.ADORev = updateResp.Rev
+							a.Store.Save(t)
+						}
+						respFB.Body.Close()
+						logf(logChan, "  -> Successfully updated ADO Work Item #%d (Skipped State)\n", *t.ADOID)
+						goto skipErr
+					}
+					if respFB != nil {
+						respFB.Body.Close()
+					}
+				}
+				
 				logf(logChan, "  -> ADO rejected update for task %s (HTTP %d). Response: %s\n", t.ID, resp.StatusCode, bodyStr)
 				return nil, fmt.Errorf("ADO update failed (HTTP %d): %s", resp.StatusCode, bodyStr)
+				
+				skipErr:
 			} else {
 				var updateResp struct {
 					Rev int `json:"rev"`
