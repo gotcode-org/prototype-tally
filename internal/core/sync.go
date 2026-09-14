@@ -152,7 +152,7 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 				t.ADOID = &adoResp.ID
 				t.UpdatedAt = time.Now()
 				a.Store.Save(t)
-				logf(logChan, "  -> Successfully created ADO Work Item #%d\n", cfg.ADO.DefaultProject, *t.ADOID)
+				logf(logChan, "  -> Successfully created ADO Work Item #%d\n", *t.ADOID)
 			} else if resp.StatusCode == 400 && cfg.User.Email != "" {
 				resp.Body.Close()
 				logf(logChan, "  -> ADO rejected the AssignedTo identity. Retrying without assignment...\n")
@@ -179,7 +179,7 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 					t.ADOID = &adoResp.ID
 					t.UpdatedAt = time.Now()
 					a.Store.Save(t)
-					logf(logChan, "  -> Successfully created ADO Work Item #%d (Unassigned)\n", cfg.ADO.DefaultProject, *t.ADOID)
+					logf(logChan, "  -> Successfully created ADO Work Item #%d (Unassigned)\n", *t.ADOID)
 				} else {
 					if err == nil {
 						body, _ := io.ReadAll(resp2.Body)
@@ -263,7 +263,7 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 			
 			if len(patch) > 0 {
 				payload, _ := json.Marshal(patch)
-				url := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, cfg.ADO.DefaultProject, *t.ADOID)
+				url := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
 				
 				req, _ := http.NewRequest("PATCH", url, bytes.NewBuffer(payload))
 				req.Header.Set("Content-Type", "application/json-patch+json")
@@ -282,7 +282,7 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 							t.ADORev = updateResp.Rev
 							a.Store.Save(t) // Force save immediately so we don't rely on TimeLog changes
 						}
-						logf(logChan, "  -> Successfully updated ADO Work Item #%d\n", cfg.ADO.DefaultProject, *t.ADOID)
+						logf(logChan, "  -> Successfully updated ADO Work Item #%d\n", *t.ADOID)
 						// Dump the payload we sent and the ADO response if debugging is enabled
 						if cfg.ADO.Debug {
 							logf(logChan, "     [DEBUG] Sent Payload: %s\n", string(payload))
@@ -305,7 +305,7 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 				continue
 			}
 
-			logf(logChan, "Pushing %d seconds of time to 7pace for ADO #%d...\n\n\n", logEntry.Seconds, cfg.ADO.DefaultProject, *t.ADOID)
+			logf(logChan, "Pushing %d seconds of time to 7pace for ADO #%d...\n\n\n", logEntry.Seconds, *t.ADOID)
 			
 			logData := map[string]interface{}{
 				"timestamp":  logEntry.Timestamp.Format(time.RFC3339),
@@ -872,17 +872,17 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 			t.ADOID = &adoResp.ID
 			t.UpdatedAt = time.Now()
 			a.Store.Save(t)
-			logf(logChan, "  -> Successfully created ADO Work Item #%d\n", cfg.ADO.DefaultProject, *t.ADOID)
+			logf(logChan, "  -> Successfully created ADO Work Item #%d\n", *t.ADOID)
 		} else {
 			resp.Body.Close()
 			logf(logChan, "  -> Failed to create ADO Work Item: HTTP %d\n", resp.StatusCode)
 			return nil, fmt.Errorf("failed to create: HTTP %d", resp.StatusCode)
 		}
 	} else {
-		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, cfg.ADO.DefaultProject, *t.ADOID)
+		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, *t.ADOID)
 		
 		latestRev := t.ADORev
-		revUrl := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
+		revUrl := fmt.Sprintf("%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), *t.ADOID)
 		reqRev, _ := http.NewRequest("GET", revUrl, nil)
 		reqRev.SetBasicAuth("", adoPat)
 		if respRev, err := client.Do(reqRev); err == nil && respRev.StatusCode == 200 {
@@ -958,7 +958,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		}
 
 		payload, _ := json.Marshal(patch)
-		url := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, cfg.ADO.DefaultProject, *t.ADOID)
+		url := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
 		
 		req, _ := http.NewRequest("PATCH", url, bytes.NewBuffer(payload))
 		req.Header.Set("Content-Type", "application/json-patch+json")
@@ -969,9 +969,9 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode >= 400 {
 				bodyStr := string(body)
-				if strings.Contains(bodyStr, "TF401346") || strings.Contains(bodyStr, "rev") || resp.StatusCode == 412  {
-					logf(logChan, "  -> Conflict! ADO item #%d was modified remotely. Fetching details...\n", cfg.ADO.DefaultProject, *t.ADOID)
-					detailUrl := fmt.Sprintf("%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
+				if strings.Contains(bodyStr, "TF401346") || strings.Contains(bodyStr, "rev") || resp.StatusCode == 412 || resp.StatusCode == 400 {
+					logf(logChan, "  -> Conflict! ADO item #%d was modified remotely. Fetching details...\n", *t.ADOID)
+					detailUrl := fmt.Sprintf("%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), *t.ADOID)
 					reqF, _ := http.NewRequest("GET", detailUrl, nil)
 					reqF.SetBasicAuth("", adoPat)
 					respF, err := client.Do(reqF)
@@ -1014,7 +1014,6 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 					}
 				}
 				logf(logChan, "  -> ADO rejected update for task %s (HTTP %d). Response: %s\n", t.ID, resp.StatusCode, bodyStr)
-				return nil, fmt.Errorf("ADO update failed (HTTP %d): %s", resp.StatusCode, bodyStr)
 			} else {
 				var updateResp struct {
 					Rev int `json:"rev"`
@@ -1023,7 +1022,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 					t.ADORev = updateResp.Rev
 					a.Store.Save(t)
 				}
-				logf(logChan, "  -> Successfully updated ADO Work Item #%d\n", cfg.ADO.DefaultProject, *t.ADOID)
+				logf(logChan, "  -> Successfully updated ADO Work Item #%d\n", *t.ADOID)
 			}
 			resp.Body.Close()
 		}
@@ -1036,7 +1035,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 			continue
 		}
 
-		logf(logChan, "Pushing %d seconds of time to 7pace for ADO #%d...\n\n", logEntry.Seconds, cfg.ADO.DefaultProject, *t.ADOID)
+		logf(logChan, "Pushing %d seconds of time to 7pace for ADO #%d...\n\n", logEntry.Seconds, *t.ADOID)
 		
 		logData := map[string]interface{}{
 			"timestamp":  logEntry.Timestamp.Format(time.RFC3339),
