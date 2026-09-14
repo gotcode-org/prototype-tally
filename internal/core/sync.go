@@ -882,7 +882,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		logf(logChan, "Syncing task %s (ADO #%d...\no ADO...\n", t.ID, *t.ADOID)
 		
 		latestRev := t.ADORev
-		revUrl := fmt.Sprintf("%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), *t.ADOID)
+		revUrl := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
 		reqRev, _ := http.NewRequest("GET", revUrl, nil)
 		reqRev.SetBasicAuth("", adoPat)
 		if respRev, err := client.Do(reqRev); err == nil && respRev.StatusCode == 200 {
@@ -969,7 +969,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode >= 400 {
 				bodyStr := string(body)
-				if strings.Contains(bodyStr, "TF401346") || strings.Contains(bodyStr, "rev") || resp.StatusCode == 412 || resp.StatusCode == 400 {
+				if strings.Contains(bodyStr, "TF401346") || strings.Contains(bodyStr, "rev") || resp.StatusCode == 412 {
 					logf(logChan, "  -> Conflict! ADO item #%d was modified remotely. Fetching details...\n", *t.ADOID)
 					detailUrl := fmt.Sprintf("%s/_apis/wit/workitems/%d?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), *t.ADOID)
 					reqF, _ := http.NewRequest("GET", detailUrl, nil)
@@ -1014,6 +1014,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 					}
 				}
 				logf(logChan, "  -> ADO rejected update for task %s (HTTP %d). Response: %s\n", t.ID, resp.StatusCode, bodyStr)
+				return nil, fmt.Errorf("ADO update failed (HTTP %d): %s", resp.StatusCode, bodyStr)
 			} else {
 				var updateResp struct {
 					Rev int `json:"rev"`
