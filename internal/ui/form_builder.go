@@ -190,30 +190,32 @@ func (f *FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if f.Fields[f.FocusIndex].Type == FieldButton {
 				return f, f.Fields[f.FocusIndex].Action(f)
 			}
+			f.FocusIndex = (f.FocusIndex + 1) % len(f.Fields)
+			f.updateFocus()
+			return f, nil
 		case "left", "h":
 			field := f.Fields[f.FocusIndex]
 			if (field.Type == FieldSelector || field.Type == FieldBoolean) && field.Selected > 0 {
-				field.Selected--
+				f.Fields[f.FocusIndex].Selected--
 				return f, nil
 			}
 		case "right", "l":
 			field := f.Fields[f.FocusIndex]
 			if (field.Type == FieldSelector || field.Type == FieldBoolean) && field.Selected < len(field.Options)-1 {
-				field.Selected++
+				f.Fields[f.FocusIndex].Selected++
 				return f, nil
 			}
 		}
 	}
 
 	if len(f.Fields) > 0 {
-		field := f.Fields[f.FocusIndex]
-		if field.Type == FieldText {
+		if f.Fields[f.FocusIndex].Type == FieldText {
 			var cmd tea.Cmd
-			field.TextInput, cmd = field.TextInput.Update(msg)
+			f.Fields[f.FocusIndex].TextInput, cmd = f.Fields[f.FocusIndex].TextInput.Update(msg)
 			return f, cmd
-		} else if field.Type == FieldTextArea {
+		} else if f.Fields[f.FocusIndex].Type == FieldTextArea {
 			var cmd tea.Cmd
-			field.TextArea, cmd = field.TextArea.Update(msg)
+			f.Fields[f.FocusIndex].TextArea, cmd = f.Fields[f.FocusIndex].TextArea.Update(msg)
 			return f, cmd
 		}
 	}
