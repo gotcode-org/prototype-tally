@@ -24,13 +24,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Execute boots the Cobra CLI framework.
-func Execute() {
-	rootCmd := &cobra.Command{
-		Use:   "tally",
-		Short: "Tally is a blazing fast time tracker and task manager",
-	}
+var rootCmd = &cobra.Command{
+	Use:   "tally",
+	Short: "Tally is a blazing fast time tracker and task manager",
+}
 
+func init() {
 	rootCmd.AddCommand(newAddCmd())
 	rootCmd.AddCommand(newDeleteCmd())
 	rootCmd.AddCommand(newActivitiesCmd())
@@ -50,7 +49,11 @@ func Execute() {
 	rootCmd.AddCommand(newMigrateCmd())
 	rootCmd.AddCommand(newDebugArchiveCmd())
 	rootCmd.AddCommand(newStandupCmd())
+	rootCmd.AddCommand(newShellCmd())
+}
 
+// Execute boots the Cobra CLI framework.
+func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
