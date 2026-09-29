@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/c-bata/go-prompt"
@@ -44,6 +45,12 @@ func executor(in string) {
 
 	if in == "exit" || in == "quit" {
 		fmt.Println("Goodbye!")
+		
+		// Fix terminal raw mode before exit
+		restoreCmd := exec.Command("stty", "-raw", "echo")
+		restoreCmd.Stdin = os.Stdin
+		_ = restoreCmd.Run()
+		
 		os.Exit(0)
 	}
 
