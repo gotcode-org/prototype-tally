@@ -74,10 +74,17 @@ func executor(in string) {
 		return
 	}
 
-	// Block TUI from shell to avoid breaking terminal state
+	// Intercept the UI command and spawn a sandbox child process
 	if args[0] == "ui" {
-		fmt.Println("Error: The TUI cannot be launched from within the shell.")
-		fmt.Println("Type 'exit' to leave the shell, then run 'tally ui' instead.")
+		cmd := exec.Command(os.Args[0], "ui")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		
+		_ = cmd.Run()
+		
+		// Clear the screen so the shell prompt redraws cleanly
+		fmt.Print("\033[H\033[2J")
 		return
 	}
 
@@ -96,7 +103,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 	if len(args) <= 1 {
 		var suggestions []prompt.Suggest
 		for _, cmd := range rootCmd.Commands() {
-			if cmd.Use == "ui" || cmd.Use == "shell" {
+			if cmd.Use == "shell" {
 				continue
 			}
 			suggestions = append(suggestions, prompt.Suggest{
