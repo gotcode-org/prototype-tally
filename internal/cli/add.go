@@ -25,6 +25,7 @@ import (
 )
 
 func newAddCmd() *cobra.Command {
+	var name string
 	var adoType string
 	var tags []string
 	var recurrence string
@@ -32,9 +33,9 @@ func newAddCmd() *cobra.Command {
 	var swimlane string
 
 	cmd := &cobra.Command{
-		Use:   "add [title]",
+		Use:   "add --name <title>",
 		Short: "Create a new task",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Initialize storage (Presentation layer doing setup)
 			s, err := store.NewStore("")
@@ -44,7 +45,7 @@ func newAddCmd() *cobra.Command {
 			app := core.NewApp(s)
 
 			// Execute business logic
-			task, err := app.AddTask(args[0], adoType, tags, recurrence, parentID, swimlane)
+			task, err := app.AddTask(name, adoType, tags, recurrence, parentID, swimlane)
 			if err != nil {
 				return err
 			}
@@ -55,6 +56,9 @@ func newAddCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&name, "name", "", "The title or name of the new task")
+	cmd.MarkFlagRequired("name")
+	
 	cmd.Flags().StringVar(&adoType, "type", "", "ADO Work Item Type (e.g., Story, Bug)")
 	cmd.Flags().StringSliceVar(&tags, "tags", []string{}, "Comma-separated list of tags")
 	cmd.Flags().StringVar(&recurrence, "recur", "", "Set a recurrence rule (e.g., daily)")

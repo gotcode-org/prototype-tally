@@ -132,6 +132,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 	// 2. Flag Name Autocompletion (for 'add' command)
 	if command == "add" && strings.HasPrefix(lastArg, "-") {
 		flags := []prompt.Suggest{
+			{Text: "--name", Description: "The title or name of the new task (Required)"},
 			{Text: "--type", Description: "ADO Work Item Type (e.g., Story, Bug)"},
 			{Text: "--swimlane", Description: "The swimlane to put the task in"},
 			{Text: "--tags", Description: "Comma-separated list of tags"},
