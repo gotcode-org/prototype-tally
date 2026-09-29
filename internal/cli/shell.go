@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,27 +27,76 @@ func newShellCmd() *cobra.Command {
 	return cmd
 }
 
-// sshParser wraps the standard posix parser to fix ANSI escape fragmentation over SSH during key repeats.
+// sshParser wraps the standard posix parser to fix ANSI escape fragmentation and chunking over SSH.
 type sshParser struct {
 	prompt.ConsoleParser
+	buf []byte
 }
 
 func (p *sshParser) Read() ([]byte, error) {
-	b, err := p.ConsoleParser.Read()
-	if err != nil || len(b) == 0 {
-		return b, err
+	if len(p.buf) == 0 {
+		b, err := p.ConsoleParser.Read()
+		if err != nil || len(b) == 0 {
+			return b, err
+		}
+
+		// Anti-fragmentation: wait a tiny bit if it looks truncated
+		if b[len(b)-1] == 27 || (len(b) >= 2 && b[len(b)-2] == 27 && b[len(b)-1] == '[') || (len(b) >= 2 && b[len(b)-2] == 27 && b[len(b)-1] == 'O') {
+			time.Sleep(15 * time.Millisecond)
+			b2, err2 := p.ConsoleParser.Read()
+			if err2 == nil && len(b2) > 0 {
+				b = append(b, b2...)
+			}
+		}
+		p.buf = b
 	}
 
-	// If the read ends in the middle of a likely ANSI sequence (e.g. \x1b or \x1b[),
-	// we sleep for a tiny fraction of time to allow the next TCP packet to arrive.
-	if b[len(b)-1] == 27 || (len(b) >= 2 && b[len(b)-2] == 27 && b[len(b)-1] == '[') || (len(b) >= 2 && b[len(b)-2] == 27 && b[len(b)-1] == 'O') {
-		time.Sleep(15 * time.Millisecond)
-		b2, err2 := p.ConsoleParser.Read()
-		if err2 == nil && len(b2) > 0 {
-			b = append(b, b2...)
+	// Now we have bytes in p.buf. We must return EXACTLY ONE sequence or string of regular text.
+	if p.buf[0] != 27 {
+		idx := bytes.IndexByte(p.buf, 27)
+		if idx == -1 {
+			res := p.buf
+			p.buf = nil
+			return res, nil
 		}
+		res := p.buf[:idx]
+		p.buf = p.buf[idx:]
+		return res, nil
 	}
-	return b, nil
+
+	// It's an escape sequence starting with \x1b.
+	if len(p.buf) == 1 {
+		res := p.buf
+		p.buf = nil
+		return res, nil
+	}
+
+	endIdx := 1
+	if p.buf[1] == '[' {
+		// CSI sequence: \x1b [ ... <char 0x40-0x7E>
+		endIdx = 2
+		for endIdx < len(p.buf) {
+			if p.buf[endIdx] >= 0x40 && p.buf[endIdx] <= 0x7E {
+				endIdx++
+				break
+			}
+			endIdx++
+		}
+	} else if p.buf[1] == 'O' {
+		// SS3 sequence: \x1b O <char>
+		if len(p.buf) >= 3 {
+			endIdx = 3
+		} else {
+			endIdx = len(p.buf)
+		}
+	} else {
+		// Alt+Key (e.g. \x1b b)
+		endIdx = 2
+	}
+
+	res := p.buf[:endIdx]
+	p.buf = p.buf[endIdx:]
+	return res, nil
 }
 
 func runInteractiveShell() {
