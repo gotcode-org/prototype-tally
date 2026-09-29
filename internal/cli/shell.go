@@ -8,6 +8,8 @@ import (
 
 	"github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
+	"gotcode.org/tally/internal/core"
+	"gotcode.org/tally/internal/store"
 )
 
 func newShellCmd() *cobra.Command {
@@ -72,23 +74,65 @@ func executor(in string) {
 }
 
 func completer(d prompt.Document) []prompt.Suggest {
-	var suggestions []prompt.Suggest
+	text := d.TextBeforeCursor()
+	args := strings.Split(text, " ")
 
-	// Dynamically grab all available Tally commands for autocomplete
-	for _, cmd := range rootCmd.Commands() {
-		// Don't suggest the UI or shell recursively
-		if cmd.Use == "ui" || cmd.Use == "shell" {
+	// If we are typing the first word (the command)
+	if len(args) <= 1 {
+		var suggestions []prompt.Suggest
+		for _, cmd := range rootCmd.Commands() {
+			if cmd.Use == "ui" || cmd.Use == "shell" {
+				continue
+			}
+			suggestions = append(suggestions, prompt.Suggest{
+				Text:        cmd.Use,
+				Description: cmd.Short,
+			})
+		}
+		suggestions = append(suggestions, prompt.Suggest{Text: "exit", Description: "Exit the shell"})
+		suggestions = append(suggestions, prompt.Suggest{Text: "quit", Description: "Exit the shell"})
+		suggestions = append(suggestions, prompt.Suggest{Text: "help", Description: "Show help"})
+
+		return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
+	}
+
+	// If we are past the first word, check context for Task ID suggestions
+	command := args[0]
+	needsTaskID := false
+	switch command {
+	case "delete", "edit", "log", "points", "push", "state", "debug-task":
+		needsTaskID = true
+	}
+
+	if needsTaskID && len(args) == 2 {
+		return prompt.FilterHasPrefix(getTaskSuggestions(), d.GetWordBeforeCursor(), true)
+	}
+
+	return []prompt.Suggest{}
+}
+
+func getTaskSuggestions() []prompt.Suggest {
+	var suggestions []prompt.Suggest
+	s, err := store.NewStore("")
+	if err != nil {
+		return suggestions
+	}
+	app := core.NewApp(s)
+	tasks, err := app.ListTasks("")
+	if err != nil {
+		return suggestions
+	}
+
+	for _, t := range tasks {
+		// Suggest active tasks to avoid cluttering the autocomplete
+		st := strings.ToLower(string(t.Status))
+		if st == "closed" || st == "done" || st == "resolved" || st == "completed" || st == "removed" {
 			continue
 		}
 		suggestions = append(suggestions, prompt.Suggest{
-			Text:        cmd.Use,
-			Description: cmd.Short,
+			Text:        t.ID,
+			Description: t.Title,
 		})
 	}
-	
-	suggestions = append(suggestions, prompt.Suggest{Text: "exit", Description: "Exit the shell"})
-	suggestions = append(suggestions, prompt.Suggest{Text: "quit", Description: "Exit the shell"})
-	suggestions = append(suggestions, prompt.Suggest{Text: "help", Description: "Show help"})
-
-	return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
+	return suggestions
 }
