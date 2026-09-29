@@ -494,7 +494,7 @@ func (m *MainModel) buildLogTimeForm(id string) {
 			}
 
 			if timeStr != "" {
-				m.coreApp.LogTime(id, timeStr, activityID)
+				m.coreApp.LogTime(id, timeStr, activityID, time.Time{})
 			}
 			return FormSubmitMsg{}
 		}

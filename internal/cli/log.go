@@ -29,6 +29,7 @@ import (
 
 func newLogCmd() *cobra.Command {
 	var activity string
+	var dateStr string
 	cmd := &cobra.Command{
 		Use:   "log [id] [duration]",
 		Short: "Retroactively log time to a task (e.g., tally log 20260901.001 30m)",
@@ -52,11 +53,20 @@ func newLogCmd() *cobra.Command {
 				}
 			}
 
+			var logDate time.Time
+			if dateStr != "" {
+				parsed, err := time.Parse("2006-01-02", dateStr)
+				if err != nil {
+					return fmt.Errorf("invalid date format, must be YYYY-MM-DD: %w", err)
+				}
+				logDate = parsed
+			}
+
 			app := core.NewApp(s)
 			id := args[0]
 			durationStr := args[1]
 
-			task, err := app.LogTime(id, durationStr, activityID)
+			task, err := app.LogTime(id, durationStr, activityID, logDate)
 			if err != nil {
 				return err
 			}
@@ -67,5 +77,6 @@ func newLogCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&activity, "activity", "", "The friendly name of the activity type")
+	cmd.Flags().StringVar(&dateStr, "date", "", "Date to log the time for (YYYY-MM-DD)")
 	return cmd
 }
