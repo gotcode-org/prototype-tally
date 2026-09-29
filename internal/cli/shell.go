@@ -138,7 +138,17 @@ func completer(d prompt.Document) []prompt.Suggest {
 		return prompt.FilterHasPrefix(lanes, lastArg, true)
 	}
 
-	// 2. Flag Name Autocompletion (for 'add' command)
+	if prevArg == "--activity" {
+		var acts []prompt.Suggest
+		if cfg, err := config.Load(); err == nil {
+			for name := range cfg.SevenPace.Activities {
+				acts = append(acts, prompt.Suggest{Text: name})
+			}
+		}
+		return prompt.FilterHasPrefix(acts, lastArg, true)
+	}
+
+	// 2. Flag Name Autocompletion (for 'add' and 'log' command)
 	if command == "add" && strings.HasPrefix(lastArg, "-") {
 		flags := []prompt.Suggest{
 			{Text: "--name", Description: "The title or name of the new task (Required)"},
@@ -147,6 +157,13 @@ func completer(d prompt.Document) []prompt.Suggest {
 			{Text: "--tags", Description: "Comma-separated list of tags"},
 			{Text: "--recur", Description: "Set a recurrence rule"},
 			{Text: "--parent", Description: "The Tally ID of the parent Story"},
+		}
+		return prompt.FilterHasPrefix(flags, lastArg, true)
+	}
+
+	if command == "log" && strings.HasPrefix(lastArg, "-") {
+		flags := []prompt.Suggest{
+			{Text: "--activity", Description: "The friendly name of the activity type"},
 		}
 		return prompt.FilterHasPrefix(flags, lastArg, true)
 	}
