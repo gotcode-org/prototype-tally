@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Interactive Shell Mode**: Added `tally shell` to launch a blazing-fast REPL loop with full context-aware tab completion for commands, task IDs, ADO types, swimlanes (read dynamically from config), and 7pace activities.
+- **Time Summary CLI**: Added `tally summary` (with aliases `stats` and `time`) to instantly print time logged for the Day, Week, Month, and Year to standard output.
+- **TUI Shell Integration**: The `ui` command can now be cleanly launched from within the `tally shell`, running in an isolated child process to protect terminal state.
 - **Native UI Sync Engine**: The `sync` (`s`), `fetch` (`p`), and `push_single` (`u`) operations now run entirely within the native Bubbletea event loop instead of suspending the TUI to run a raw bash shell.
 - **Standup Finished Items**: The `tally standup` CLI and TUI report generator now explicitly loops in tasks marked as Closed, Done, Resolved, or Completed within the last 48 hours.
 - **Scrollable TUI Modals**: The Standup Report (`r`) and the new Version dashboard (`v`) open in compact, centered UI modals with full vertical scrolling (`up`/`down`, `pgup`/`pgdown`, `j`/`k`).
@@ -22,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic Story Sizing**: Tally automatically defaults empty ADO tasks to `story_points: 1.0` when fetching to satisfy strict ADO Agile state transition rules upon pushing.
 
 ### Changed
+- **List Active Tasks Default**: The `list` command now defaults to hiding completed/closed tasks. Added a `--status` flag to filter by a specific status (or `all`).
+- **Add Command Flags**: The `add` command now requires a `--name` flag instead of accepting a loose positional argument for the task title.
 - **Sync Visuals**: Replaced the raw terminal log wall during sync operations with an animated, indeterminate bouncing progress bar and a 1-line real-time status output.
 - **Create Form Streamlined**: Stripped the redundant "Backlog?" toggle entirely from the UI and CLI; tasks seamlessly start as `New`.
 
