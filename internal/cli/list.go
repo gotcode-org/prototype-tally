@@ -20,6 +20,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -30,11 +31,12 @@ import (
 
 func newListCmd() *cobra.Command {
 	var dateFilter string
+	var statusFilter string
 
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List tasks (optionally filtered by date)",
+		Short:   "List tasks (optionally filtered by date and status)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s, err := store.NewStore("")
 			if err != nil {
@@ -55,7 +57,21 @@ func newListCmd() *cobra.Command {
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 			fmt.Fprintln(w, "ID	STATE	TYPE	TIME	TITLE")
 
+			printed := 0
 			for _, t := range tasks {
+				// Apply status filtering
+				if statusFilter != "" && !strings.EqualFold(statusFilter, "all") {
+					if !strings.EqualFold(string(t.Status), statusFilter) {
+						continue
+					}
+				} else if statusFilter == "" {
+					// Default: Hide closed/done/resolved tasks
+					st := strings.ToLower(string(t.Status))
+					if st == "closed" || st == "done" || st == "resolved" || st == "completed" || st == "removed" {
+						continue
+					}
+				}
+
 				dur := time.Duration(t.TotalSeconds) * time.Second
 				timeStr := dur.String()
 				if t.TotalSeconds == 0 {
@@ -68,14 +84,20 @@ func newListCmd() *cobra.Command {
 				}
 
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", t.ID, t.Status, adoType, timeStr, t.Title)
+				printed++
 			}
 			
-			w.Flush()
+			if printed == 0 {
+				fmt.Println("No tasks found matching the given filters.")
+			} else {
+				w.Flush()
+			}
 			return nil
 		},
 	}
 	
 	cmd.Flags().StringVarP(&dateFilter, "date", "d", "", "Filter tasks by date (e.g. 2026, 202609, 20260901)")
+	cmd.Flags().StringVarP(&statusFilter, "status", "s", "", "Filter tasks by status (e.g. Closed, active, New, all)")
 	
 	return cmd
 }
