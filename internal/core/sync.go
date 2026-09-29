@@ -615,6 +615,7 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 						if sResp.StatusCode == 200 {
 							type WorkLog struct {
 								Length int `json:"length"`
+								Timestamp time.Time `json:"timestamp"`
 								WorkItemId int `json:"workItemId"`
 								WorkItem struct {
 									ID int `json:"id"`
@@ -633,6 +634,7 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 							json.Unmarshal(sBody, &sData)
 							
 							totalTime := 0
+							var timeLogs []TimeLog
 							allLogs := append(sData.Data, append(sData.Items, sData.Value...)...)
 							
 							for _, l := range allLogs {
@@ -646,10 +648,16 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 								
 								if targetEmail == "" || strings.EqualFold(l.User.Email, targetEmail) {
 									totalTime += l.Length
+									timeLogs = append(timeLogs, TimeLog{
+										Timestamp: l.Timestamp,
+										Seconds:   l.Length,
+										Synced:    true,
+									})
 								}
 							}
 							newTask.TotalSeconds = totalTime
 							newTask.SyncedSeconds = totalTime
+							newTask.TimeLogs = timeLogs
 						}
 						sResp.Body.Close()
 					}
