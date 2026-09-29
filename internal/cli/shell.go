@@ -123,7 +123,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 	// 1. Flag Value Autocompletion
 	if prevArg == "--type" || prevArg == "-t" {
 		types := []prompt.Suggest{
-			{Text: "Story"}, {Text: "Technical Story"}, {Text: "Bug"}, {Text: "Task"},
+			{Text: "Story"}, {Text: `"Technical Story"`}, {Text: "Bug"}, {Text: "Task"},
 		}
 		return prompt.FilterHasPrefix(types, lastArg, true)
 	}
@@ -132,6 +132,9 @@ func completer(d prompt.Document) []prompt.Suggest {
 		var lanes []prompt.Suggest
 		if cfg, err := config.Load(); err == nil {
 			for _, s := range cfg.ADO.Swimlanes {
+				if strings.Contains(s, " ") {
+					s = fmt.Sprintf(`"%s"`, s)
+				}
 				lanes = append(lanes, prompt.Suggest{Text: s})
 			}
 		}
@@ -142,6 +145,9 @@ func completer(d prompt.Document) []prompt.Suggest {
 		var acts []prompt.Suggest
 		if cfg, err := config.Load(); err == nil {
 			for name := range cfg.SevenPace.Activities {
+				if strings.Contains(name, " ") {
+					name = fmt.Sprintf(`"%s"`, name)
+				}
 				acts = append(acts, prompt.Suggest{Text: name})
 			}
 		}
