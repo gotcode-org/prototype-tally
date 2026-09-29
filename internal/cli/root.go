@@ -50,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(newDebugArchiveCmd())
 	rootCmd.AddCommand(newStandupCmd())
 	rootCmd.AddCommand(newShellCmd())
+	rootCmd.AddCommand(newSummaryCmd())
 }
 
 // Execute boots the Cobra CLI framework.
