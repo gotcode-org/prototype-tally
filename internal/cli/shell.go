@@ -36,6 +36,20 @@ func runInteractiveShell() {
 		prompt.OptionPrefix("tally> "),
 		prompt.OptionTitle("Tally Shell"),
 		prompt.OptionPrefixTextColor(prompt.Green),
+		prompt.OptionAddKeyBind(prompt.KeyBind{
+			Key: prompt.Home,
+			Fn: func(buf *prompt.Buffer) {
+				x := []rune(buf.Document().TextBeforeCursor())
+				buf.CursorLeft(len(x))
+			},
+		}),
+		prompt.OptionAddKeyBind(prompt.KeyBind{
+			Key: prompt.End,
+			Fn: func(buf *prompt.Buffer) {
+				x := []rune(buf.Document().TextAfterCursor())
+				buf.CursorRight(len(x))
+			},
+		}),
 	)
 
 	p.Run()
