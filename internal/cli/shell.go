@@ -56,6 +56,11 @@ func executor(in string) {
 		os.Exit(0)
 	}
 
+	if in == "clear" || in == "cls" {
+		fmt.Print("\033[H\033[2J")
+		return
+	}
+
 	// Split input to pass to cobra
 	args := strings.Fields(in)
 
@@ -91,6 +96,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 		}
 		suggestions = append(suggestions, prompt.Suggest{Text: "exit", Description: "Exit the shell"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "quit", Description: "Exit the shell"})
+		suggestions = append(suggestions, prompt.Suggest{Text: "clear", Description: "Clear the screen"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "help", Description: "Show help"})
 
 		return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
