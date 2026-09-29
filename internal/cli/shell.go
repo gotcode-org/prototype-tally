@@ -50,9 +50,31 @@ func runInteractiveShell() {
 				buf.CursorRight(len(x))
 			},
 		}),
+		// Catch raw terminal byte sequences for Home
+		prompt.OptionAddASCIICodeBind(
+			prompt.ASCIICodeBind{ASCIICode: []byte{27, 91, 72}, Fn: goStart},        // \x1b[H
+			prompt.ASCIICodeBind{ASCIICode: []byte{27, 91, 49, 126}, Fn: goStart},   // \x1b[1~
+			prompt.ASCIICodeBind{ASCIICode: []byte{27, 79, 72}, Fn: goStart},        // \x1bOH
+		),
+		// Catch raw terminal byte sequences for End
+		prompt.OptionAddASCIICodeBind(
+			prompt.ASCIICodeBind{ASCIICode: []byte{27, 91, 70}, Fn: goEnd},          // \x1b[F
+			prompt.ASCIICodeBind{ASCIICode: []byte{27, 91, 52, 126}, Fn: goEnd},     // \x1b[4~
+			prompt.ASCIICodeBind{ASCIICode: []byte{27, 79, 70}, Fn: goEnd},          // \x1bOF
+		),
 	)
 
 	p.Run()
+}
+
+func goStart(buf *prompt.Buffer) {
+	x := []rune(buf.Document().TextBeforeCursor())
+	buf.CursorLeft(len(x))
+}
+
+func goEnd(buf *prompt.Buffer) {
+	x := []rune(buf.Document().TextAfterCursor())
+	buf.CursorRight(len(x))
 }
 
 func executor(in string) {
