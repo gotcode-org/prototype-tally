@@ -8,6 +8,7 @@ import (
 
 	"github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
+	"gotcode.org/tally/internal/config"
 	"gotcode.org/tally/internal/core"
 	"gotcode.org/tally/internal/store"
 )
@@ -102,16 +103,54 @@ func completer(d prompt.Document) []prompt.Suggest {
 		return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
 	}
 
-	// If we are past the first word, check context for Task ID suggestions
+	// If we are past the first word, check context
 	command := args[0]
+	lastArg := args[len(args)-1]
+	prevArg := ""
+	if len(args) > 1 {
+		prevArg = args[len(args)-2]
+	}
+
+	// 1. Flag Value Autocompletion
+	if prevArg == "--type" || prevArg == "-t" {
+		types := []prompt.Suggest{
+			{Text: "Story"}, {Text: "Technical Story"}, {Text: "Bug"}, {Text: "Task"},
+		}
+		return prompt.FilterHasPrefix(types, lastArg, true)
+	}
+
+	if prevArg == "--swimlane" {
+		var lanes []prompt.Suggest
+		if cfg, err := config.Load(); err == nil {
+			for _, s := range cfg.ADO.Swimlanes {
+				lanes = append(lanes, prompt.Suggest{Text: s})
+			}
+		}
+		return prompt.FilterHasPrefix(lanes, lastArg, true)
+	}
+
+	// 2. Flag Name Autocompletion (for 'add' command)
+	if command == "add" && strings.HasPrefix(lastArg, "-") {
+		flags := []prompt.Suggest{
+			{Text: "--type", Description: "ADO Work Item Type (e.g., Story, Bug)"},
+			{Text: "--swimlane", Description: "The swimlane to put the task in"},
+			{Text: "--tags", Description: "Comma-separated list of tags"},
+			{Text: "--recur", Description: "Set a recurrence rule"},
+			{Text: "--parent", Description: "The Tally ID of the parent Story"},
+		}
+		return prompt.FilterHasPrefix(flags, lastArg, true)
+	}
+
+	// 3. Task ID Autocompletion
 	needsTaskID := false
 	switch command {
 	case "delete", "edit", "log", "points", "push", "state", "debug-task":
 		needsTaskID = true
 	}
 
-	if needsTaskID && len(args) == 2 {
-		return prompt.FilterHasPrefix(getTaskSuggestions(), d.GetWordBeforeCursor(), true)
+	// Only suggest task IDs for the exact second argument, and if it's not starting a flag
+	if needsTaskID && len(args) == 2 && !strings.HasPrefix(lastArg, "-") {
+		return prompt.FilterHasPrefix(getTaskSuggestions(), lastArg, true)
 	}
 
 	return []prompt.Suggest{}
