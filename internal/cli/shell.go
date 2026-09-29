@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/c-bata/go-prompt"
+	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 	"gotcode.org/tally/internal/config"
 	"gotcode.org/tally/internal/core"
@@ -62,8 +63,16 @@ func executor(in string) {
 		return
 	}
 
-	// Split input to pass to cobra
-	args := strings.Fields(in)
+	// Split input to pass to cobra, respecting shell quotes!
+	args, err := shellquote.Split(in)
+	if err != nil {
+		fmt.Printf("Error parsing input: %v\n", err)
+		return
+	}
+
+	if len(args) == 0 {
+		return
+	}
 
 	// Block TUI from shell to avoid breaking terminal state
 	if args[0] == "ui" {
