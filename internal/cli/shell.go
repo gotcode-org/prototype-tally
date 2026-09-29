@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/c-bata/go-prompt"
 	"github.com/kballard/go-shellquote"
@@ -25,14 +26,40 @@ func newShellCmd() *cobra.Command {
 	return cmd
 }
 
+// sshParser wraps the standard posix parser to fix ANSI escape fragmentation over SSH during key repeats.
+type sshParser struct {
+	prompt.ConsoleParser
+}
+
+func (p *sshParser) Read() ([]byte, error) {
+	b, err := p.ConsoleParser.Read()
+	if err != nil || len(b) == 0 {
+		return b, err
+	}
+
+	// If the read ends in the middle of a likely ANSI sequence (e.g. \x1b or \x1b[),
+	// we sleep for a tiny fraction of time to allow the next TCP packet to arrive.
+	if b[len(b)-1] == 27 || (len(b) >= 2 && b[len(b)-2] == 27 && b[len(b)-1] == '[') || (len(b) >= 2 && b[len(b)-2] == 27 && b[len(b)-1] == 'O') {
+		time.Sleep(15 * time.Millisecond)
+		b2, err2 := p.ConsoleParser.Read()
+		if err2 == nil && len(b2) > 0 {
+			b = append(b, b2...)
+		}
+	}
+	return b, nil
+}
+
 func runInteractiveShell() {
 	fmt.Println("Welcome to the Tally Interactive Shell.")
 	fmt.Println("Type 'help' to see available commands, or 'exit' to quit.")
 	fmt.Println("Note: The full-screen TUI cannot be launched from within this shell.")
 
+	parser := prompt.NewStandardInputParser()
+
 	p := prompt.New(
 		executor,
 		completer,
+		prompt.OptionParser(&sshParser{ConsoleParser: parser}),
 		prompt.OptionPrefix("tally> "),
 		prompt.OptionTitle("Tally Shell"),
 		prompt.OptionPrefixTextColor(prompt.Green),
