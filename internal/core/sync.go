@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"strings"
 	"strconv"
-	"sync"
 	"time"
 
 	"gotcode.org/tally/internal/config"
@@ -540,67 +539,68 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 		
 		orgName := extractOrgName(cfg.ADO.Organization)
 		if orgName != "" && sevenPaceToken != "" {
-			var wg sync.WaitGroup
-			var mu sync.Mutex
+			var filterParts []string
 			for _, details := range batchDetails.Value {
-				wg.Add(1)
-				go func(adoID int) {
-					defer wg.Done()
-					sevenUrl := fmt.Sprintf("https://%s.timehub.7pace.com/api/rest/workLogs?api-version=3.1&$filter=WorkItemId%%20eq%%20%d", orgName, adoID)
-					sReq, _ := http.NewRequest("GET", sevenUrl, nil)
-					sReq.Header.Set("Authorization", "Bearer "+sevenPaceToken)
-					sResp, err := client.Do(sReq)
-					if err == nil {
-						sBody, _ := io.ReadAll(sResp.Body)
-						if sResp.StatusCode == 200 {
-							type WorkLog struct {
-								Length int `json:"length"`
-								Timestamp time.Time `json:"timestamp"`
-								WorkItemId int `json:"workItemId"`
-								WorkItem struct {
-									ID int `json:"id"`
-								} `json:"workItem"`
-								User struct {
-									Email string `json:"email"`
-								} `json:"user"`
-							}
-							var sData struct {
-								Data  []WorkLog `json:"data"`
-								Items []WorkLog `json:"items"`
-								Value []WorkLog `json:"value"`
-							}
-							json.Unmarshal(sBody, &sData)
-							
-							totalTime := 0
-							var timeLogs []TimeLog
-							allLogs := append(sData.Data, append(sData.Items, sData.Value...)...)
-							
-							for _, l := range allLogs {
-								if l.WorkItemId != adoID && l.WorkItem.ID != adoID {
-									continue
-								}
-								targetEmail := cfg.SevenPace.Email
-								if targetEmail == "" {
-									targetEmail = cfg.User.Email
-								}
-								if targetEmail == "" || strings.EqualFold(l.User.Email, targetEmail) {
-									totalTime += l.Length
-									timeLogs = append(timeLogs, TimeLog{
-										Timestamp: l.Timestamp,
-										Seconds:   l.Length,
-										Synced:    true,
-									})
-								}
-							}
-							mu.Lock()
-							sevenMap[adoID] = &SevenData{TotalTime: totalTime, TimeLogs: timeLogs}
-							mu.Unlock()
-						}
-						sResp.Body.Close()
-					}
-				}(details.ID)
+				filterParts = append(filterParts, fmt.Sprintf("WorkItemId eq %d", details.ID))
 			}
-			wg.Wait()
+			
+			if len(filterParts) > 0 {
+				filterStr := strings.Join(filterParts, " or ")
+				escapedFilter := strings.ReplaceAll(strings.ReplaceAll(filterStr, " ", "%20"), "=", "%3D")
+				sevenUrl := fmt.Sprintf("https://%s.timehub.7pace.com/api/rest/workLogs?api-version=3.1&$filter=%s", orgName, escapedFilter)
+				
+				sReq, _ := http.NewRequest("GET", sevenUrl, nil)
+				sReq.Header.Set("Authorization", "Bearer "+sevenPaceToken)
+				sResp, err := client.Do(sReq)
+				if err == nil {
+					sBody, _ := io.ReadAll(sResp.Body)
+					if sResp.StatusCode == 200 {
+						type WorkLog struct {
+							Length int `json:"length"`
+							Timestamp time.Time `json:"timestamp"`
+							WorkItemId int `json:"workItemId"`
+							WorkItem struct {
+								ID int `json:"id"`
+							} `json:"workItem"`
+							User struct {
+								Email string `json:"email"`
+							} `json:"user"`
+						}
+						var sData struct {
+							Data  []WorkLog `json:"data"`
+							Items []WorkLog `json:"items"`
+							Value []WorkLog `json:"value"`
+						}
+						json.Unmarshal(sBody, &sData)
+						
+						allLogs := append(sData.Data, append(sData.Items, sData.Value...)...)
+						
+						for _, l := range allLogs {
+							wid := l.WorkItemId
+							if wid == 0 {
+								wid = l.WorkItem.ID
+							}
+							
+							targetEmail := cfg.SevenPace.Email
+							if targetEmail == "" {
+								targetEmail = cfg.User.Email
+							}
+							if targetEmail == "" || strings.EqualFold(l.User.Email, targetEmail) {
+								if sevenMap[wid] == nil {
+									sevenMap[wid] = &SevenData{}
+								}
+								sevenMap[wid].TotalTime += l.Length
+								sevenMap[wid].TimeLogs = append(sevenMap[wid].TimeLogs, TimeLog{
+									Timestamp: l.Timestamp,
+									Seconds:   l.Length,
+									Synced:    true,
+								})
+							}
+						}
+					}
+					sResp.Body.Close()
+				}
+			}
 		}
 		
 		for _, details := range batchDetails.Value {
