@@ -23,22 +23,34 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"strconv"
 	"time"
 
 	"gotcode.org/tally/internal/config"
 	md "github.com/JohannesKaufmann/html-to-markdown"
+	"github.com/PuerkitoBio/goquery"
 )
 
-var divRe = regexp.MustCompile(`</div>\s*<div>`)
-
-func cleanADOHTML(html string) string {
-	if html == "" {
-		return ""
-	}
-	return divRe.ReplaceAllString(html, "<br>")
+func getMarkdownConverter() *md.Converter {
+	converter := md.NewConverter("", true, &md.Options{EscapeMode: "disabled"})
+	converter.AddRules(
+		md.Rule{
+			Filter: []string{"br"},
+			Replacement: func(content string, selec *goquery.Selection, opt *md.Options) *string {
+				s := "\n"
+				return &s
+			},
+		},
+		md.Rule{
+			Filter: []string{"div"},
+			Replacement: func(content string, selec *goquery.Selection, opt *md.Options) *string {
+				s := content + "\n"
+				return &s
+			},
+		},
+	)
+	return converter
 }
 
 func logf(logChan chan<- string, format string, args ...interface{}) {
@@ -434,7 +446,7 @@ func parseMarkdownSections(body string) (description, acceptanceCriteria string)
 // Fetch queries ADO for all work items assigned to the current user, and restores any missing local markdown files.
 func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, logChan chan<- string) ([]*Task, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	converter := md.NewConverter("", true, &md.Options{EscapeMode: "disabled"})
+	converter := getMarkdownConverter()
 	
 	fetchDays := cfg.ADO.FetchDays
 	if fetchDays <= 0 {
@@ -564,9 +576,6 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			
 			descriptionHTML, _ := details.Fields["System.Description"].(string)
 			acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
-			
-			descriptionHTML = cleanADOHTML(descriptionHTML)
-			acHTML = cleanADOHTML(acHTML)
 			
 			var bodyBuilder strings.Builder
 			if descriptionHTML != "" {
@@ -787,9 +796,6 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			
 			descriptionHTML, _ := details.Fields["System.Description"].(string)
 			acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
-			
-			descriptionHTML = cleanADOHTML(descriptionHTML)
-			acHTML = cleanADOHTML(acHTML)
 			
 			var bodyBuilder strings.Builder
 			if descriptionHTML != "" {
@@ -1037,9 +1043,6 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 						converter := md.NewConverter("", true, &md.Options{EscapeMode: "disabled"})
 						descHTML, _ := details.Fields["System.Description"].(string)
 						acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
-						
-						descHTML = cleanADOHTML(descHTML)
-						acHTML = cleanADOHTML(acHTML)
 						
 						var bodyBuilder strings.Builder
 						if descHTML != "" {
