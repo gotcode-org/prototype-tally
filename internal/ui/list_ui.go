@@ -307,12 +307,12 @@ func formatStatusCell(status string, width int, isCursor bool, bgStyle lipgloss.
 		fg = ThemeBase
 	}
 
-	badge := lipgloss.NewStyle().Foreground(fg).Background(bgStyle.GetBackground()).Bold(true).Render(strings.ToUpper(status))
-	visibleLen := lipgloss.Width(badge)
-
-	if visibleLen > width {
-		return badge[:width]
+	raw := strings.ToUpper(status)
+	if len(raw) > width {
+		raw = raw[:width]
 	}
+
+	badge := lipgloss.NewStyle().Foreground(fg).Background(bgStyle.GetBackground()).Bold(true).Render(raw)
 
 	return badge
 }
@@ -436,19 +436,12 @@ func renderRow(title, idStr, typeStr, statusCell, progress string, widths []int,
 	
 	formatColLeftANSI := func(txt string, w int) string {
 		visibleLen := lipgloss.Width(txt)
-		if visibleLen > w {
-			// This is technically unsafe for ANSI, but we only use it for short strings like TimeText
-			return rowStyle.Render(txt[:w-3] + "...")
-		}
 		spaces := strings.Repeat(" ", w-visibleLen)
 		return txt + rowStyle.Render(spaces)
 	}
 	
 	formatColCenter := func(txt string, w int) string {
 		visibleLen := lipgloss.Width(txt)
-		if visibleLen > w {
-			return rowStyle.Render(txt[:w-3] + "...")
-		}
 		if txt == "" {
 			return rowStyle.Render(strings.Repeat(" ", w))
 		}
@@ -575,10 +568,18 @@ func (m ListModel) View() string {
 					if active {
 						tColor = ThemeBase
 					}
-					typeCell = lipgloss.NewStyle().Foreground(tColor).Background(bgStyle.GetBackground()).Bold(true).Render(strings.ToUpper(row.Item.Type))
+					raw := strings.ToUpper(row.Item.Type)
+					if len(raw) > widths[2] {
+						if widths[2] > 3 {
+							raw = raw[:widths[2]-3] + "..."
+						} else {
+							raw = raw[:widths[2]]
+						}
+					}
+					typeCell = lipgloss.NewStyle().Foreground(tColor).Background(bgStyle.GetBackground()).Bold(true).Render(raw)
 				}
 				
-				statusCell := formatStatusCell(row.Item.Status, widths[2], active, bgStyle)
+				statusCell := formatStatusCell(row.Item.Status, widths[3], active, bgStyle)
 
 				var progressCell string
 				if row.Item.TimeText != "" {
@@ -586,7 +587,15 @@ func (m ListModel) View() string {
 					if active {
 						pColor = ThemeBase
 					}
-					progressCell = lipgloss.NewStyle().Foreground(pColor).Background(bgStyle.GetBackground()).Render(row.Item.TimeText)
+					raw := row.Item.TimeText
+					if len(raw) > widths[4] {
+						if widths[4] > 3 {
+							raw = raw[:widths[4]-3] + "..."
+						} else {
+							raw = raw[:widths[4]]
+						}
+					}
+					progressCell = lipgloss.NewStyle().Foreground(pColor).Background(bgStyle.GetBackground()).Render(raw)
 				} else {
 					progressCell = lipgloss.NewStyle().Foreground(ThemeSubtext).Background(bgStyle.GetBackground()).Render("-")
 				}
