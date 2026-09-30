@@ -126,11 +126,19 @@ func newActivitiesCmd() *cobra.Command {
 				return nil
 			}
 
-			// Print the table
-			fmt.Printf("%-40s | %s\n", "ACTIVITY NAME", "GUID")
-			fmt.Println(strings.Repeat("-", 41) + "+" + strings.Repeat("-", 38))
+			maxWidth := 13 // Length of "ACTIVITY NAME"
 			for _, item := range items {
-				fmt.Printf("%-40s | %s\n", item.Name, item.ID)
+				if len(item.Name) > maxWidth {
+					maxWidth = len(item.Name)
+				}
+			}
+
+			// Print the table
+			formatStr := fmt.Sprintf("%%-%ds | %%s\n", maxWidth)
+			fmt.Printf(formatStr, "ACTIVITY NAME", "GUID")
+			fmt.Println(strings.Repeat("-", maxWidth+1) + "+" + strings.Repeat("-", 38))
+			for _, item := range items {
+				fmt.Printf(formatStr, item.Name, item.ID)
 			}
 			fmt.Println()
 
