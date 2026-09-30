@@ -62,6 +62,7 @@ func newSyncCmd() *cobra.Command {
 				return err
 			}
 
+			s.CommitChanges("tally sync: Pushed offline changes to ADO and 7pace")
 			fmt.Println("\nSync complete.")
 			return nil
 		},

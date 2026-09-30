@@ -31,6 +31,7 @@ type TaskStore interface {
 	ListTasks(datePrefix string) ([]*Task, error)
 	GetTaskPath(id string) string
 	Delete(id string) error
+	CommitChanges(message string) error
 }
 
 // App acts as the CQRS orchestrator containing all business logic.

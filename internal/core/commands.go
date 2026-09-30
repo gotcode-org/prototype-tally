@@ -64,6 +64,8 @@ func (a *App) AddTask(title string, adoType string, tags []string, recurrence st
 	if err := a.Store.Save(task); err != nil {
 		return nil, fmt.Errorf("failed to save task: %w", err)
 	}
+	
+	a.Store.CommitChanges(fmt.Sprintf("tally add: Created task %s", task.ID))
 
 	return task, nil
 }
@@ -99,6 +101,8 @@ func (a *App) LogTime(id string, durationStr string, activityID string, date tim
 	if err := a.Store.Save(task); err != nil {
 		return nil, fmt.Errorf("failed to save task after logging time: %w", err)
 	}
+	
+	a.Store.CommitChanges(fmt.Sprintf("tally log: Added %s to task %s", durationStr, task.ID))
 
 	return task, nil
 }
@@ -116,6 +120,8 @@ func (a *App) SetState(id string, state string) (*Task, error) {
 	if err := a.Store.Save(task); err != nil {
 		return nil, fmt.Errorf("failed to save task after updating state: %w", err)
 	}
+	
+	a.Store.CommitChanges(fmt.Sprintf("tally state: Changed state of %s to %s", task.ID, state))
 
 	return task, nil
 }
@@ -133,6 +139,8 @@ func (a *App) SetPoints(id string, points float64) (*Task, error) {
 	if err := a.Store.Save(task); err != nil {
 		return nil, fmt.Errorf("failed to save task after updating points: %w", err)
 	}
+	
+	a.Store.CommitChanges(fmt.Sprintf("tally points: Updated points for %s to %.1f", task.ID, points))
 
 	return task, nil
 }
@@ -140,7 +148,11 @@ func (a *App) SetPoints(id string, points float64) (*Task, error) {
 
 // DeleteTask removes the task from disk.
 func (a *App) DeleteTask(id string) error {
-	return a.Store.Delete(id)
+	err := a.Store.Delete(id)
+	if err == nil {
+		a.Store.CommitChanges(fmt.Sprintf("tally delete: Removed task %s", id))
+	}
+	return err
 }
 
 
@@ -172,6 +184,8 @@ func (a *App) StartTask(id string) error {
 	if err := a.Store.Save(task); err != nil {
 		return fmt.Errorf("failed to save migrated task: %w", err)
 	}
+	
+	a.Store.CommitChanges(fmt.Sprintf("tally backlog: Moved task %s to today (%s)", id, task.ID))
 	
 	// Also need to move the physical markdown body content since Save only writes frontmatter right now?
 	// Wait, does Save() write the body?

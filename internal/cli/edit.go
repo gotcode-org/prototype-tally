@@ -56,7 +56,11 @@ func newEditCmd() *cobra.Command {
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 
-			return c.Run()
+			err = c.Run()
+			if err == nil {
+				s.CommitChanges(fmt.Sprintf("tally edit: Modified task %s", id))
+			}
+			return err
 		},
 	}
 	return cmd

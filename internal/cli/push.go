@@ -40,6 +40,9 @@ func newPushCmd() *cobra.Command {
 
 			fmt.Printf("Pushing isolated task %s to ADO...\n", targetID)
 			_, err = app.SyncSingle(cfg, adoPat, sevenPaceToken, targetID, nil)
+			if err == nil {
+				s.CommitChanges(fmt.Sprintf("tally push: Pushed task %s to ADO", targetID))
+			}
 			return err
 		},
 	}

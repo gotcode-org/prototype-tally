@@ -39,6 +39,7 @@ func newFetchCmd() *cobra.Command {
 			if _, err := app.Fetch(cfg, adoPat, sevenPaceToken, nil); err != nil {
 				return err
 			}
+			s.CommitChanges("tally fetch: Synced active tasks with ADO")
 			return nil
 		},
 	}
