@@ -642,6 +642,17 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			newTask.StoryPoints = spPtr
 			newTask.ADOID = &adoIdVal
 			newTask.ADORev = details.Rev
+			
+			var tags []string
+			if tagsStr, ok := details.Fields["System.Tags"].(string); ok && tagsStr != "" {
+				for _, t := range strings.Split(tagsStr, ";") {
+					if strings.TrimSpace(t) != "" {
+						tags = append(tags, strings.TrimSpace(t))
+					}
+				}
+			}
+			newTask.Tags = tags
+			
 			newTask.UpdatedAt = updatedAt
 			newTask.Body = bodyBuilder.String()
 			
