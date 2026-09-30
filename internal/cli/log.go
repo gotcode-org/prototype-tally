@@ -44,13 +44,11 @@ func newLogCmd() *cobra.Command {
 				return err
 			}
 			
-			activityID := cfg.SevenPace.ActivityID
-			if activity != "" {
-				if idStr, exists := cfg.SevenPace.Activities[activity]; exists {
-					activityID = idStr
-				} else {
-					return fmt.Errorf("activity '%s' not found in config", activity)
-				}
+			var activityID string
+			if idStr, exists := cfg.SevenPace.Activities[activity]; exists {
+				activityID = idStr
+			} else {
+				return fmt.Errorf("activity '%s' not found in config", activity)
 			}
 
 			var logDate time.Time
@@ -76,7 +74,8 @@ func newLogCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&activity, "activity", "", "The friendly name of the activity type")
+	cmd.Flags().StringVar(&activity, "activity", "", "The friendly name of the activity type (Required)")
+	cmd.MarkFlagRequired("activity")
 	cmd.Flags().StringVar(&dateStr, "date", "", "Date to log the time for (YYYY-MM-DD)")
 	return cmd
 }

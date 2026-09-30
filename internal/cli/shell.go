@@ -289,7 +289,8 @@ func completer(d prompt.Document) []prompt.Suggest {
 
 	if command == "log" && strings.HasPrefix(lastArg, "-") {
 		flags := []prompt.Suggest{
-			{Text: "--activity", Description: "The friendly name of the activity type"},
+			{Text: "--activity", Description: "The friendly name of the activity type (Required)"},
+			{Text: "--date", Description: "Date to log the time for (YYYY-MM-DD)"},
 		}
 		return prompt.FilterHasPrefix(flags, lastArg, true)
 	}
