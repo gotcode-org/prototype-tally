@@ -3,19 +3,20 @@ package store
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
+	"time"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // InitGit ensures the BaseDir is a git repository.
 func (s *Store) InitGit() error {
 	gitDir := filepath.Join(s.BaseDir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		cmd := exec.Command("git", "init")
-		cmd.Dir = s.BaseDir
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to init git: %w", err)
+		_, err := git.PlainInit(s.BaseDir, false)
+		if err != nil && err != git.ErrRepositoryAlreadyExists {
+			return fmt.Errorf("failed to init go-git: %w", err)
 		}
 	}
 	return nil
@@ -27,30 +28,37 @@ func (s *Store) CommitChanges(message string) error {
 		return err
 	}
 
-	// Check if there are changes to commit
-	statusCmd := exec.Command("git", "status", "--porcelain")
-	statusCmd.Dir = s.BaseDir
-	out, err := statusCmd.Output()
+	r, err := git.PlainOpen(s.BaseDir)
 	if err != nil {
-		return fmt.Errorf("failed to check git status: %w", err)
+		return fmt.Errorf("failed to open repo: %w", err)
 	}
 
-	if len(strings.TrimSpace(string(out))) == 0 {
-		// No changes to commit
+	w, err := r.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	status, err := w.Status()
+	if err != nil {
+		return fmt.Errorf("failed to get status: %w", err)
+	}
+
+	if status.IsClean() {
 		return nil
 	}
 
-	// Add all changes
-	addCmd := exec.Command("git", "add", ".")
-	addCmd.Dir = s.BaseDir
-	if err := addCmd.Run(); err != nil {
+	if err := w.AddWithOptions(&git.AddOptions{All: true}); err != nil {
 		return fmt.Errorf("failed to git add: %w", err)
 	}
 
-	// Commit
-	commitCmd := exec.Command("git", "commit", "-m", message)
-	commitCmd.Dir = s.BaseDir
-	if err := commitCmd.Run(); err != nil {
+	_, err = w.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Tally",
+			Email: "tally@localhost",
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
 		return fmt.Errorf("failed to git commit: %w", err)
 	}
 

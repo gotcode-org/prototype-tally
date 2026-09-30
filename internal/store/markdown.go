@@ -45,7 +45,9 @@ func NewStore(baseDir string) (*Store, error) {
 		baseDir = filepath.Join(home, ".local", "share", "tally", "tasks")
 	}
 
-	return &Store{BaseDir: baseDir}, nil
+	s := &Store{BaseDir: baseDir}
+	_ = s.InitGit() // Automatically init git on store creation
+	return s, nil
 }
 
 // getTaskPath calculates the exact YYYY/MM/DD path for a given task ID.
