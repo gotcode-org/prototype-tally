@@ -590,6 +590,7 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			if descriptionHTML != "" {
 				markdown, err := converter.ConvertString(descriptionHTML)
 				if err == nil {
+					bodyBuilder.WriteString("# Description\n\n")
 					bodyBuilder.WriteString(markdown)
 				}
 			}
@@ -597,9 +598,9 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 				markdown, err := converter.ConvertString(acHTML)
 				if err == nil {
 					if bodyBuilder.Len() > 0 {
-						bodyBuilder.WriteString("\n\n---\n\n")
+						bodyBuilder.WriteString("\n\n")
 					}
-					bodyBuilder.WriteString("### Acceptance Criteria\n\n")
+					bodyBuilder.WriteString("# Acceptance Criteria\n\n")
 					bodyBuilder.WriteString(markdown)
 				}
 			}
@@ -815,6 +816,7 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			if descriptionHTML != "" {
 				markdown, err := converter.ConvertString(descriptionHTML)
 				if err == nil {
+					bodyBuilder.WriteString("# Description\n\n")
 					bodyBuilder.WriteString(markdown)
 				}
 			}
@@ -822,9 +824,9 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 				markdown, err := converter.ConvertString(acHTML)
 				if err == nil {
 					if bodyBuilder.Len() > 0 {
-						bodyBuilder.WriteString("\n\n---\n\n")
+						bodyBuilder.WriteString("\n\n")
 					}
-					bodyBuilder.WriteString("### Acceptance Criteria\n\n")
+					bodyBuilder.WriteString("# Acceptance Criteria\n\n")
 					bodyBuilder.WriteString(markdown)
 				}
 			}
@@ -1061,15 +1063,16 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 						var bodyBuilder strings.Builder
 						if descHTML != "" {
 							if markdown, err := converter.ConvertString(descHTML); err == nil {
+								bodyBuilder.WriteString("# Description\n\n")
 								bodyBuilder.WriteString(markdown)
 							}
 						}
 						if acHTML != "" {
 							if markdown, err := converter.ConvertString(acHTML); err == nil {
 								if bodyBuilder.Len() > 0 {
-									bodyBuilder.WriteString("\n\n---\n\n")
+									bodyBuilder.WriteString("\n\n")
 								}
-								bodyBuilder.WriteString("### Acceptance Criteria\n\n")
+								bodyBuilder.WriteString("# Acceptance Criteria\n\n")
 								bodyBuilder.WriteString(markdown)
 							}
 						}
