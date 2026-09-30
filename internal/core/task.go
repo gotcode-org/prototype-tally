@@ -39,6 +39,7 @@ type Task struct {
 	Title     string    `yaml:"title"`      // e.g., "Upgrade Redis Cluster"
 	Status    TaskState `yaml:"status"`     // open, active, paused, closed
 	Tags      []string  `yaml:"tags,omitempty"`
+	SyncedTags []string `yaml:"synced_tags,omitempty"` // ADO cache for 3-way merge
 	CreatedAt time.Time `yaml:"created_at"`
 	UpdatedAt time.Time `yaml:"updated_at"`
 

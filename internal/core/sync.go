@@ -653,6 +653,7 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 				}
 			}
 			newTask.Tags = tags
+			newTask.SyncedTags = tags
 			
 			newTask.UpdatedAt = updatedAt
 			newTask.Body = bodyBuilder.String()
@@ -960,7 +961,9 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		
 		latestRev := t.ADORev
 		remoteState := ""
-		revUrl := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev,System.State&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
+		var liveTags []string
+		
+		revUrl := fmt.Sprintf("%s/%s/_apis/wit/workitems/%d?$expand=none&fields=System.Rev,System.State,System.Tags&api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject, *t.ADOID)
 		reqRev, _ := http.NewRequest("GET", revUrl, nil)
 		reqRev.SetBasicAuth("", adoPat)
 		if respRev, err := client.Do(reqRev); err == nil && respRev.StatusCode == 200 {
@@ -973,6 +976,13 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 				latestRev = revData.Rev
 				if val, ok := revData.Fields["System.State"].(string); ok {
 					remoteState = val
+				}
+				if tagsStr, ok := revData.Fields["System.Tags"].(string); ok && tagsStr != "" {
+					for _, tg := range strings.Split(tagsStr, ";") {
+						if strings.TrimSpace(tg) != "" {
+							liveTags = append(liveTags, strings.TrimSpace(tg))
+						}
+					}
 				}
 			}
 			respRev.Body.Close()
@@ -1003,10 +1013,15 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 			}
 		}
 		
-		if len(t.Tags) > 0 {
+		mergedTags := mergeTags(liveTags, t.Tags, t.SyncedTags)
+		if len(mergedTags) > 0 || len(liveTags) > 0 {
 			patch = append(patch, map[string]interface{}{
-				"op": "add", "path": "/fields/System.Tags", "value": strings.Join(t.Tags, "; "),
+				"op": "add", "path": "/fields/System.Tags", "value": strings.Join(mergedTags, "; "),
 			})
+			
+			// Update local state to reflect the merge
+			t.Tags = mergedTags
+			t.SyncedTags = mergedTags
 		}
 		
 		if cfg.ADO.SwimlaneField != "" && t.Swimlane != "" {
@@ -1193,4 +1208,52 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 	}
 
 	return nil, nil
+}
+
+// mergeTags performs a 3-way merge on ADO tags to prevent overwriting coworker changes.
+func mergeTags(liveADO []string, local []string, synced []string) []string {
+	added := make(map[string]bool)
+	removed := make(map[string]bool)
+
+	syncedMap := make(map[string]bool)
+	for _, t := range synced {
+		syncedMap[strings.ToLower(strings.TrimSpace(t))] = true
+	}
+
+	localMap := make(map[string]bool)
+	for _, t := range local {
+		tLow := strings.ToLower(strings.TrimSpace(t))
+		localMap[tLow] = true
+		if !syncedMap[tLow] {
+			added[tLow] = true
+		}
+	}
+
+	for _, t := range synced {
+		tLow := strings.ToLower(strings.TrimSpace(t))
+		if !localMap[tLow] {
+			removed[tLow] = true
+		}
+	}
+
+	finalMap := make(map[string]string)
+	for _, t := range liveADO {
+		tLow := strings.ToLower(strings.TrimSpace(t))
+		if !removed[tLow] {
+			finalMap[tLow] = strings.TrimSpace(t) // preserve original case from ADO
+		}
+	}
+
+	for _, t := range local {
+		tLow := strings.ToLower(strings.TrimSpace(t))
+		if added[tLow] {
+			finalMap[tLow] = strings.TrimSpace(t) // add new local tag
+		}
+	}
+
+	var result []string
+	for _, v := range finalMap {
+		result = append(result, v)
+	}
+	return result
 }
