@@ -412,7 +412,7 @@ func parseMarkdownSections(body string) (description, acceptanceCriteria string)
 // Fetch queries ADO for all work items assigned to the current user, and restores any missing local markdown files.
 func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, logChan chan<- string) ([]*Task, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	converter := md.NewConverter("", true, nil)
+	converter := md.NewConverter("", true, &md.Options{EscapeMode: "disabled"})
 	
 	fetchDays := cfg.ADO.FetchDays
 	if fetchDays <= 0 {
@@ -987,7 +987,7 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 						if val, ok := details.Fields["System.Title"].(string); ok { newTask.Title = val }
 						if val, ok := details.Fields["System.State"].(string); ok { newTask.Status = TaskState(val) }
 						
-						converter := md.NewConverter("", true, nil)
+						converter := md.NewConverter("", true, &md.Options{EscapeMode: "disabled"})
 						descHTML, _ := details.Fields["System.Description"].(string)
 						acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
 						var bodyBuilder strings.Builder
