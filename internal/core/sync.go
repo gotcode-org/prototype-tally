@@ -219,6 +219,13 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 
 		// 1.5 Update State if Closed
 		if t.ADOID != nil {
+			// If tags changed locally, defer to SyncSingle to ensure a safe 3-way merge!
+			if strings.Join(t.Tags, ";") != strings.Join(t.SyncedTags, ";") {
+				logf(logChan, "  -> Delegating %s to SyncSingle for safe tag merge...\n", t.ID)
+				a.SyncSingle(cfg, adoPat, sevenPaceToken, t.ID, logChan)
+				continue
+			}
+
 			patch := []map[string]interface{}{}
 			
 			// Always sync title
@@ -230,12 +237,6 @@ func (a *App) Sync(cfg *config.Config, adoPat string, sevenPaceToken string, log
 			if t.Status != "open" && t.Status != "active" {
 				patch = append(patch, map[string]interface{}{
 					"op": "add", "path": "/fields/System.State", "value": t.Status,
-				})
-			}
-			
-			if len(t.Tags) > 0 {
-				patch = append(patch, map[string]interface{}{
-					"op": "add", "path": "/fields/System.Tags", "value": strings.Join(t.Tags, "; "),
 				})
 			}
 			
@@ -1015,8 +1016,12 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 		
 		mergedTags := mergeTags(liveTags, t.Tags, t.SyncedTags)
 		if len(mergedTags) > 0 || len(liveTags) > 0 {
+			op := "add"
+			if len(liveTags) > 0 {
+				op = "replace"
+			}
 			patch = append(patch, map[string]interface{}{
-				"op": "add", "path": "/fields/System.Tags", "value": strings.Join(mergedTags, "; "),
+				"op": op, "path": "/fields/System.Tags", "value": strings.Join(mergedTags, "; "),
 			})
 			
 			// Update local state to reflect the merge
