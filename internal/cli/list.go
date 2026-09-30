@@ -20,6 +20,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -32,6 +33,8 @@ import (
 func newListCmd() *cobra.Command {
 	var dateFilter string
 	var statusFilter string
+	var page int
+	var limit int
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -54,10 +57,7 @@ func newListCmd() *cobra.Command {
 				return nil
 			}
 
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-			fmt.Fprintln(w, "ID	STATE	TYPE	TIME	TITLE")
-
-			printed := 0
+			var filteredTasks []*core.Task
 			for _, t := range tasks {
 				// Apply status filtering
 				if statusFilter != "" && !strings.EqualFold(statusFilter, "all") {
@@ -71,7 +71,39 @@ func newListCmd() *cobra.Command {
 						continue
 					}
 				}
+				filteredTasks = append(filteredTasks, t)
+			}
+			
+			total := len(filteredTasks)
+			if total == 0 {
+				fmt.Println("No tasks found matching the given filters.")
+				return nil
+			}
 
+			// Sort by ID descending (chronological, newest first)
+			sort.Slice(filteredTasks, func(i, j int) bool {
+				return filteredTasks[i].ID > filteredTasks[j].ID
+			})
+
+			if limit <= 0 {
+				limit = total
+			}
+			start := (page - 1) * limit
+			if start >= total {
+				fmt.Printf("Page %d is empty (only %d matching tasks).\n", page, total)
+				return nil
+			}
+			end := start + limit
+			if end > total {
+				end = total
+			}
+
+			paginatedTasks := filteredTasks[start:end]
+
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+			fmt.Fprintln(w, "ID\tSTATE\tTYPE\tTIME\tTITLE")
+
+			for _, t := range paginatedTasks {
 				dur := time.Duration(t.TotalSeconds) * time.Second
 				timeStr := dur.String()
 				if t.TotalSeconds == 0 {
@@ -84,20 +116,20 @@ func newListCmd() *cobra.Command {
 				}
 
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", t.ID, t.Status, adoType, timeStr, t.Title)
-				printed++
 			}
 			
-			if printed == 0 {
-				fmt.Println("No tasks found matching the given filters.")
-			} else {
-				w.Flush()
-			}
+			w.Flush()
+			
+			totalPages := (total + limit - 1) / limit
+			fmt.Printf("\nPage %d of %d (Showing %d-%d of %d tasks)\n", page, totalPages, start+1, end, total)
 			return nil
 		},
 	}
 	
 	cmd.Flags().StringVarP(&dateFilter, "date", "d", "", "Filter tasks by date (e.g. 2026, 202609, 20260901)")
 	cmd.Flags().StringVarP(&statusFilter, "status", "s", "", "Filter tasks by status (e.g. Closed, active, New, all)")
+	cmd.Flags().IntVarP(&page, "page", "p", 1, "Page number to display")
+	cmd.Flags().IntVarP(&limit, "limit", "l", 40, "Number of tasks per page (set to 0 for unlimited)")
 	
 	return cmd
 }
