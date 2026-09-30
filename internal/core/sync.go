@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"strconv"
 	"time"
@@ -30,6 +31,15 @@ import (
 	"gotcode.org/tally/internal/config"
 	md "github.com/JohannesKaufmann/html-to-markdown"
 )
+
+var divRe = regexp.MustCompile(`</div>\s*<div>`)
+
+func cleanADOHTML(html string) string {
+	if html == "" {
+		return ""
+	}
+	return divRe.ReplaceAllString(html, "<br>")
+}
 
 func logf(logChan chan<- string, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
@@ -393,20 +403,32 @@ func parseMarkdownSections(body string) (description, acceptanceCriteria string)
 			continue
 		}
 		
-		// ADO WYSIWYG requires proper block elements, bare text with <br> is often swallowed
 		htmlLine := line
 		if htmlLine == "" {
 			htmlLine = "<br>"
+		} else {
+			htmlLine = htmlLine + "<br>"
 		}
 		
 		if currentSection == "description" {
-			descBuilder.WriteString(fmt.Sprintf("<div>%s</div>", htmlLine))
+			descBuilder.WriteString(htmlLine)
 		} else if currentSection == "ac" {
-			acBuilder.WriteString(fmt.Sprintf("<div>%s</div>", htmlLine))
+			acBuilder.WriteString(htmlLine)
 		}
 	}
 	
-	return strings.TrimSpace(descBuilder.String()), strings.TrimSpace(acBuilder.String())
+	desc := strings.TrimSuffix(strings.TrimSpace(descBuilder.String()), "<br>")
+	ac := strings.TrimSuffix(strings.TrimSpace(acBuilder.String()), "<br>")
+	
+	// ADO WYSIWYG requires proper block elements, bare text with <br> is often swallowed
+	if desc != "" {
+		desc = fmt.Sprintf("<div>%s</div>", desc)
+	}
+	if ac != "" {
+		ac = fmt.Sprintf("<div>%s</div>", ac)
+	}
+	
+	return desc, ac
 }
 
 // Fetch queries ADO for all work items assigned to the current user, and restores any missing local markdown files.
@@ -542,6 +564,9 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			
 			descriptionHTML, _ := details.Fields["System.Description"].(string)
 			acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
+			
+			descriptionHTML = cleanADOHTML(descriptionHTML)
+			acHTML = cleanADOHTML(acHTML)
 			
 			var bodyBuilder strings.Builder
 			if descriptionHTML != "" {
@@ -743,6 +768,9 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			
 			descriptionHTML, _ := details.Fields["System.Description"].(string)
 			acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
+			
+			descriptionHTML = cleanADOHTML(descriptionHTML)
+			acHTML = cleanADOHTML(acHTML)
 			
 			var bodyBuilder strings.Builder
 			if descriptionHTML != "" {
@@ -990,6 +1018,10 @@ func (a *App) SyncSingle(cfg *config.Config, adoPat string, sevenPaceToken strin
 						converter := md.NewConverter("", true, &md.Options{EscapeMode: "disabled"})
 						descHTML, _ := details.Fields["System.Description"].(string)
 						acHTML, _ := details.Fields["Microsoft.VSTS.Common.AcceptanceCriteria"].(string)
+						
+						descHTML = cleanADOHTML(descHTML)
+						acHTML = cleanADOHTML(acHTML)
+						
 						var bodyBuilder strings.Builder
 						if descHTML != "" {
 							if markdown, err := converter.ConvertString(descHTML); err == nil {
