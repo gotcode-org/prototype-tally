@@ -176,6 +176,19 @@ func executor(in string) {
 		return
 	}
 
+	if in == "history" {
+		s, err := store.NewStore("")
+		if err == nil {
+			s.InitGit()
+			cmd := exec.Command("git", "log", "--oneline", "--decorate", "--color=always", "-n", "20")
+			cmd.Dir = s.BaseDir
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			_ = cmd.Run()
+		}
+		return
+	}
+
 	// Split input to pass to cobra, respecting shell quotes!
 	args, err := shellquote.Split(in)
 	if err != nil {
@@ -227,6 +240,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 		suggestions = append(suggestions, prompt.Suggest{Text: "exit", Description: "Exit the shell"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "quit", Description: "Exit the shell"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "clear", Description: "Clear the screen"})
+		suggestions = append(suggestions, prompt.Suggest{Text: "history", Description: "View git change history"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "help", Description: "Show help"})
 
 		return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
