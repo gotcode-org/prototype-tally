@@ -694,6 +694,15 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 						newTask.TotalSeconds = totalTime + unsyncedTime
 						newTask.SyncedSeconds = totalTime
 						newTask.TimeLogs = timeLogs
+						
+						// Time merges cleanly (server + local unsynced).
+						// Save it to the existing task immediately so it isn't swallowed by CLI conflict drops.
+						if existingTask != nil {
+							existingTask.TotalSeconds = newTask.TotalSeconds
+							existingTask.SyncedSeconds = newTask.SyncedSeconds
+							existingTask.TimeLogs = newTask.TimeLogs
+							a.Store.Save(existingTask)
+						}
 					}
 					sResp.Body.Close()
 				}
