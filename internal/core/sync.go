@@ -627,65 +627,75 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 			newTask.UpdatedAt = updatedAt
 			newTask.Body = bodyBuilder.String()
 			
-			// If missing, also pull 7pace time
-			if existingTask == nil {
-				orgName := extractOrgName(cfg.ADO.Organization)
-				if orgName != "" && sevenPaceToken != "" {
-					sevenUrl := fmt.Sprintf("https://%s.timehub.7pace.com/api/rest/workLogs?api-version=3.1&$filter=WorkItemId%%20eq%%20%d", orgName, details.ID)
-					sReq, _ := http.NewRequest("GET", sevenUrl, nil)
-					sReq.Header.Set("Authorization", "Bearer "+sevenPaceToken)
-					sResp, err := client.Do(sReq)
-					if err == nil {
-						sBody, _ := io.ReadAll(sResp.Body)
-						if sResp.StatusCode == 200 {
-							type WorkLog struct {
-								Length int `json:"length"`
-								Timestamp time.Time `json:"timestamp"`
-								WorkItemId int `json:"workItemId"`
-								WorkItem struct {
-									ID int `json:"id"`
-								} `json:"workItem"`
-								User struct {
-									Email string `json:"email"`
-								} `json:"user"`
-							}
-							
-							var sData struct {
-								Data  []WorkLog `json:"data"`
-								Items []WorkLog `json:"items"`
-								Value []WorkLog `json:"value"`
-							}
-							
-							json.Unmarshal(sBody, &sData)
-							
-							totalTime := 0
-							var timeLogs []TimeLog
-							allLogs := append(sData.Data, append(sData.Items, sData.Value...)...)
-							
-							for _, l := range allLogs {
-								if l.WorkItemId != details.ID && l.WorkItem.ID != details.ID {
-									continue
-								}
-								targetEmail := cfg.SevenPace.Email
-								if targetEmail == "" {
-									targetEmail = cfg.User.Email
-								}
-								
-								if targetEmail == "" || strings.EqualFold(l.User.Email, targetEmail) {
-									totalTime += l.Length
-									timeLogs = append(timeLogs, TimeLog{
-										Timestamp: l.Timestamp,
-										Seconds:   l.Length,
-										Synced:    true,
-									})
-								}
-							}
-							newTask.TotalSeconds = totalTime
-							newTask.SyncedSeconds = totalTime
-							newTask.TimeLogs = timeLogs
+			// Always pull 7pace time and merge with any local unsynced logs
+			orgName := extractOrgName(cfg.ADO.Organization)
+			if orgName != "" && sevenPaceToken != "" {
+				sevenUrl := fmt.Sprintf("https://%s.timehub.7pace.com/api/rest/workLogs?api-version=3.1&$filter=WorkItemId%%20eq%%20%d", orgName, details.ID)
+				sReq, _ := http.NewRequest("GET", sevenUrl, nil)
+				sReq.Header.Set("Authorization", "Bearer "+sevenPaceToken)
+				sResp, err := client.Do(sReq)
+				if err == nil {
+					sBody, _ := io.ReadAll(sResp.Body)
+					if sResp.StatusCode == 200 {
+						type WorkLog struct {
+							Length int `json:"length"`
+							Timestamp time.Time `json:"timestamp"`
+							WorkItemId int `json:"workItemId"`
+							WorkItem struct {
+								ID int `json:"id"`
+							} `json:"workItem"`
+							User struct {
+								Email string `json:"email"`
+							} `json:"user"`
 						}
-						sResp.Body.Close()
+						
+						var sData struct {
+							Data  []WorkLog `json:"data"`
+							Items []WorkLog `json:"items"`
+							Value []WorkLog `json:"value"`
+						}
+						
+						json.Unmarshal(sBody, &sData)
+						
+						totalTime := 0
+						var timeLogs []TimeLog
+						allLogs := append(sData.Data, append(sData.Items, sData.Value...)...)
+						
+						for _, l := range allLogs {
+							if l.WorkItemId != details.ID && l.WorkItem.ID != details.ID {
+								continue
+							}
+							targetEmail := cfg.SevenPace.Email
+							if targetEmail == "" {
+								targetEmail = cfg.User.Email
+							}
+							
+							if targetEmail == "" || strings.EqualFold(l.User.Email, targetEmail) {
+								totalTime += l.Length
+								timeLogs = append(timeLogs, TimeLog{
+									Timestamp: l.Timestamp,
+									Seconds:   l.Length,
+									Synced:    true,
+								})
+							}
+						}
+						
+						// Merge with local unsynced logs
+						unsyncedTime := 0
+						if existingTask != nil && len(existingTask.TimeLogs) > 0 {
+							for _, localLog := range existingTask.TimeLogs {
+								if !localLog.Synced {
+									unsyncedTime += localLog.Seconds
+									timeLogs = append(timeLogs, localLog)
+								}
+							}
+						}
+						
+						newTask.TotalSeconds = totalTime + unsyncedTime
+						newTask.SyncedSeconds = totalTime
+						newTask.TimeLogs = timeLogs
 					}
+					sResp.Body.Close()
 				}
 			}
 			
