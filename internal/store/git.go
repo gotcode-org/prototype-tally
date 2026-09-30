@@ -12,6 +12,10 @@ import (
 
 // InitGit ensures the BaseDir is a git repository.
 func (s *Store) InitGit() error {
+	if err := os.MkdirAll(s.BaseDir, 0755); err != nil {
+		return fmt.Errorf("failed to create base dir: %w", err)
+	}
+
 	gitDir := filepath.Join(s.BaseDir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		_, err := git.PlainInit(s.BaseDir, false)
