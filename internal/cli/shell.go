@@ -199,9 +199,30 @@ func executor(in string) {
 	if len(args) == 0 {
 		return
 	}
+	
+	command := args[0]
+	
+	if command == "diff" {
+		if len(args) < 2 {
+			fmt.Println("Usage: diff <TaskID>")
+			return
+		}
+		s, err := store.NewStore("")
+		if err == nil {
+			s.InitGit()
+			path := s.GetTaskPath(args[1])
+			// Show the diff history of this specific file
+			cmd := exec.Command("git", "log", "-p", "--color=always", "-n", "3", "--", path)
+			cmd.Dir = s.BaseDir
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			_ = cmd.Run()
+		}
+		return
+	}
 
 	// Intercept the UI command and spawn a sandbox child process
-	if args[0] == "ui" {
+	if command == "ui" {
 		cmd := exec.Command(os.Args[0], "ui")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -241,6 +262,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 		suggestions = append(suggestions, prompt.Suggest{Text: "quit", Description: "Exit the shell"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "clear", Description: "Clear the screen"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "history", Description: "View git change history"})
+		suggestions = append(suggestions, prompt.Suggest{Text: "diff", Description: "View diff history of a specific task"})
 		suggestions = append(suggestions, prompt.Suggest{Text: "help", Description: "Show help"})
 
 		return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
@@ -312,7 +334,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 	// 3. Task ID Autocompletion
 	needsTaskID := false
 	switch command {
-	case "delete", "edit", "log", "points", "push", "state", "debug-task":
+	case "delete", "edit", "log", "points", "push", "state", "debug-task", "diff":
 		needsTaskID = true
 	}
 
