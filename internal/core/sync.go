@@ -446,7 +446,14 @@ func parseMarkdownSections(body string) (description, acceptanceCriteria string)
 
 // Fetch queries ADO for all work items assigned to the current user, and restores any missing local markdown files.
 func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, logChan chan<- string) ([]*Task, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.MaxIdleConns = 100
+	t.MaxIdleConnsPerHost = 100
+	t.MaxConnsPerHost = 100
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: t,
+	}
 	converter := getMarkdownConverter()
 	
 	fetchDays := cfg.ADO.FetchDays
@@ -542,14 +549,11 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 		if orgName != "" && sevenPaceToken != "" {
 			var wg sync.WaitGroup
 			var mu sync.Mutex
-			sem := make(chan struct{}, 5) // Concurrency limit of 5 to avoid connection pool exhaustion
 			
 			for _, details := range batchDetails.Value {
 				wg.Add(1)
 				go func(adoID int) {
 					defer wg.Done()
-					sem <- struct{}{}
-					defer func() { <-sem }()
 					
 					sevenUrl := fmt.Sprintf("https://%s.timehub.7pace.com/api/rest/workLogs?api-version=3.1&$filter=WorkItemId%%20eq%%20%d", orgName, adoID)
 					sReq, _ := http.NewRequest("GET", sevenUrl, nil)
