@@ -560,7 +560,7 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 						if sResp.StatusCode == 200 {
 							type WorkLog struct {
 								Length int `json:"length"`
-								Timestamp time.Time `json:"timestamp"`
+								Timestamp string `json:"timestamp"`
 								WorkItemId int `json:"workItemId"`
 								WorkItem struct {
 									ID int `json:"id"`
@@ -590,8 +590,13 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 								}
 								if targetEmail == "" || strings.EqualFold(l.User.Email, targetEmail) {
 									totalTime += l.Length
+									ts, _ := time.Parse(time.RFC3339, l.Timestamp)
+									if ts.IsZero() {
+										ts, _ = time.Parse("2006-01-02T15:04:05", l.Timestamp)
+									}
+									
 									timeLogs = append(timeLogs, TimeLog{
-										Timestamp: l.Timestamp,
+										Timestamp: ts,
 										Seconds:   l.Length,
 										Synced:    true,
 									})
