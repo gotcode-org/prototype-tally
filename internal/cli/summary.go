@@ -53,6 +53,7 @@ func newSummaryCmd() *cobra.Command {
 				offset = -6
 			}
 			startOfWeek := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, offset)
+			endOfWeek := startOfWeek.AddDate(0, 0, 7)
 
 			for _, t := range tasks {
 				// Calculate granular time logs
@@ -65,7 +66,7 @@ func newSummaryCmd() *cobra.Command {
 								daySec += log.Seconds
 							}
 						}
-						if !log.Timestamp.Before(startOfWeek) {
+						if !log.Timestamp.Before(startOfWeek) && log.Timestamp.Before(endOfWeek) {
 							weekSec += log.Seconds
 						}
 					}
@@ -80,7 +81,7 @@ func newSummaryCmd() *cobra.Command {
 								daySec += t.TotalSeconds
 							}
 						}
-						if !t.CreatedAt.Before(startOfWeek) {
+						if !t.CreatedAt.Before(startOfWeek) && t.CreatedAt.Before(endOfWeek) {
 							weekSec += t.TotalSeconds
 						}
 					}
