@@ -36,7 +36,6 @@ func init() {
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newLogCmd())
 	rootCmd.AddCommand(newConfigCmd())
-	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newFetchCmd())
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(newPushCmd())
