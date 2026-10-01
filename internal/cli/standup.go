@@ -90,6 +90,26 @@ func newStandupCmd() *cobra.Command {
 			}
 			sb.WriteString("\n")
 
+			sb.WriteString("## ✅ Completed (Since Yesterday)\n")
+			if len(finished) == 0 {
+				sb.WriteString("- *No recently completed items*\n")
+			} else {
+				for _, t := range finished {
+					adoTag := ""
+					if t.ADOID != nil {
+						adoTag = fmt.Sprintf("[ADO-%d] ", *t.ADOID)
+					}
+					
+					timeStr := ""
+					if t.TotalSeconds > 0 {
+						timeStr = fmt.Sprintf(" *(%.1fh tracked)*", float64(t.TotalSeconds)/3600.0)
+					}
+					
+					sb.WriteString(fmt.Sprintf("- **%s%s**%s\n", adoTag, t.Title, timeStr))
+				}
+			}
+			sb.WriteString("\n")
+
 			if outFile == "" {
 				reportsDir := ""
 				if home, err := os.UserHomeDir(); err == nil {
