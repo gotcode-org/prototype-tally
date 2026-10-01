@@ -444,8 +444,8 @@ func parseMarkdownSections(body string) (description, acceptanceCriteria string)
 	return desc, ac
 }
 
-// Fetch queries ADO for all work items assigned to the current user, and restores any missing local markdown files.
-func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, logChan chan<- string) ([]*Task, error) {
+// Fetch queries ADO for all work items assigned to the current user, or a single specific ID, and updates local files.
+func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, targetID *string, logChan chan<- string) ([]*Task, error) {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.MaxIdleConns = 100
 	t.MaxIdleConnsPerHost = 100
@@ -456,38 +456,6 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 	}
 	converter := getMarkdownConverter()
 	
-	fetchDays := cfg.ADO.FetchDays
-	if fetchDays <= 0 {
-		fetchDays = 30
-	}
-	query := fmt.Sprintf(`{"query": "Select [System.Id], [System.Title], [System.State], [System.WorkItemType] From WorkItems Where [System.AssignedTo] = @Me AND [System.ChangedDate] >= @Today - %d"}`, fetchDays)
-	
-	url := fmt.Sprintf("%s/%s/_apis/wit/wiql?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject)
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte(query)))
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth("", adoPat)
-	
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hit WIQL endpoint: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	var wiqlResp struct {
-		WorkItems []struct {
-			ID int `json:"id"`
-		} `json:"workItems"`
-	}
-	
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("WIQL rejected (HTTP %d): %s", resp.StatusCode, string(body))
-	}
-	
-	if err := json.Unmarshal(body, &wiqlResp); err != nil {
-		return nil, err
-	}
-	
 	tasks, _ := a.Store.ListTasks("")
 	adoToLocal := make(map[int]string)
 	for _, t := range tasks {
@@ -496,17 +464,69 @@ func (a *App) Fetch(cfg *config.Config, adoPat string, sevenPaceToken string, lo
 		}
 	}
 	
-	logf(logChan, "WIQL returned %d tasks assigned to you. Comparing against local files...\n", len(wiqlResp.WorkItems))
+	var allADOIDs []string
+
+	if targetID != nil && *targetID != "" {
+		// Single fetch mode
+		// Is it a local ID?
+		localT, err := a.Store.Load(*targetID)
+		if err == nil && localT != nil && localT.ADOID != nil {
+			logf(logChan, "Targeting local task %s (ADO #%d)...\n", *targetID, *localT.ADOID)
+			allADOIDs = append(allADOIDs, strconv.Itoa(*localT.ADOID))
+		} else {
+			// Assume it's a raw ADO ID to pull down
+			if _, err := strconv.Atoi(*targetID); err == nil {
+				logf(logChan, "Targeting raw ADO Work Item #%s...\n", *targetID)
+				allADOIDs = append(allADOIDs, *targetID)
+			} else {
+				return nil, fmt.Errorf("task '%s' not found locally and is not a valid ADO ID", *targetID)
+			}
+		}
+	} else {
+		// Bulk fetch mode (WIQL)
+		fetchDays := cfg.ADO.FetchDays
+		if fetchDays <= 0 {
+			fetchDays = 30
+		}
+		query := fmt.Sprintf(`{"query": "Select [System.Id], [System.Title], [System.State], [System.WorkItemType] From WorkItems Where [System.AssignedTo] = @Me AND [System.ChangedDate] >= @Today - %d"}`, fetchDays)
+		
+		url := fmt.Sprintf("%s/%s/_apis/wit/wiql?api-version=7.0", strings.TrimRight(cfg.ADO.Organization, "/"), cfg.ADO.DefaultProject)
+		req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte(query)))
+		req.Header.Set("Content-Type", "application/json")
+		req.SetBasicAuth("", adoPat)
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hit WIQL endpoint: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		var wiqlResp struct {
+			WorkItems []struct {
+				ID int `json:"id"`
+			} `json:"workItems"`
+		}
+		
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("WIQL rejected (HTTP %d): %s", resp.StatusCode, string(body))
+		}
+		
+		if err := json.Unmarshal(body, &wiqlResp); err != nil {
+			return nil, err
+		}
+		
+		logf(logChan, "WIQL returned %d tasks assigned to you. Comparing against local files...\n", len(wiqlResp.WorkItems))
+		for _, wi := range wiqlResp.WorkItems {
+			allADOIDs = append(allADOIDs, strconv.Itoa(wi.ID))
+		}
+	}
 	
 	var pendingTasks []*Task
 	var conflicts []*Task
 	childToParentADO := make(map[string]int)
 	generatedSeqs := make(map[string]int)
-	
-	var allADOIDs []string
-	for _, wi := range wiqlResp.WorkItems {
-		allADOIDs = append(allADOIDs, strconv.Itoa(wi.ID))
-	}
+
 	
 	for i := 0; i < len(allADOIDs); i += 50 {
 		end := i + 50

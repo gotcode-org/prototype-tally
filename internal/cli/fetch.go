@@ -12,8 +12,9 @@ import (
 
 func newFetchCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "fetch",
-		Short: "Fetch and restore missing tasks from ADO",
+		Use:   "fetch [id]",
+		Short: "Fetch and restore missing tasks from ADO, or a specific task by ID",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			adoPat := os.Getenv("TALLY_ADO_PAT")
 			if adoPat == "" {
@@ -35,11 +36,24 @@ func newFetchCmd() *cobra.Command {
 			}
 			app := core.NewApp(s)
 
-			fmt.Println("Connecting to Azure DevOps WIQL API...")
-			if _, err := app.Fetch(cfg, adoPat, sevenPaceToken, nil); err != nil {
+			var targetID *string
+			if len(args) == 1 {
+				targetID = &args[0]
+				fmt.Printf("Fetching specific task %s from ADO...\n", *targetID)
+			} else {
+				fmt.Println("Connecting to Azure DevOps WIQL API...")
+			}
+			
+			if _, err := app.Fetch(cfg, adoPat, sevenPaceToken, targetID, nil); err != nil {
 				return err
 			}
-			s.CommitChanges("tally fetch: Synced active tasks with ADO")
+			
+			if targetID != nil {
+				s.CommitChanges(fmt.Sprintf("tally fetch: Synced task %s with ADO", *targetID))
+			} else {
+				s.CommitChanges("tally fetch: Synced all active tasks with ADO")
+			}
+			
 			return nil
 		},
 	}

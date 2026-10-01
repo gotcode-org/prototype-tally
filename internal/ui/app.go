@@ -1095,7 +1095,7 @@ func (m *MainModel) startSyncProcess(jobType string, targetID string) tea.Cmd {
 		case "sync":
 			err = m.coreApp.Sync(cfg, adoPat, spToken, m.logChannel)
 		case "fetch":
-			conflicts, err = m.coreApp.Fetch(cfg, adoPat, spToken, m.logChannel)
+			conflicts, err = m.coreApp.Fetch(cfg, adoPat, spToken, nil, m.logChannel)
 		case "push_single":
 			conflicts, err = m.coreApp.SyncSingle(cfg, adoPat, spToken, targetID, m.logChannel)
 		}
