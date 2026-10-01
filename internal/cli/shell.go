@@ -334,7 +334,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 	// 3. Task ID Autocompletion
 	needsTaskID := false
 	switch command {
-	case "delete", "edit", "log", "points", "push", "fetch", "state", "debug-task", "diff":
+	case "delete", "edit", "log", "points", "push", "fetch", "state", "diff":
 		needsTaskID = true
 	}
 
