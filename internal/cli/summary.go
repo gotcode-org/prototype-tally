@@ -1,20 +1,3 @@
-/*
-Copyright (C) 2026 The GotCode Collective
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
 package cli
 
 import (
@@ -47,6 +30,12 @@ func newSummaryCmd() *cobra.Command {
 			now := time.Now()
 			var daySec, weekSec, monthSec, yearSec int
 
+			type dailyTaskStats struct {
+				task    *core.Task
+				seconds int
+			}
+			todayTasks := make(map[string]*dailyTaskStats)
+
 			// Determine the start of the ISO week (Monday)
 			offset := int(time.Monday - now.Weekday())
 			if offset > 0 {
@@ -64,6 +53,10 @@ func newSummaryCmd() *cobra.Command {
 							monthSec += log.Seconds
 							if log.Timestamp.Day() == now.Day() {
 								daySec += log.Seconds
+								if _, ok := todayTasks[t.ID]; !ok {
+									todayTasks[t.ID] = &dailyTaskStats{task: t, seconds: 0}
+								}
+								todayTasks[t.ID].seconds += log.Seconds
 							}
 						}
 						if !log.Timestamp.Before(startOfWeek) && log.Timestamp.Before(endOfWeek) {
@@ -79,6 +72,10 @@ func newSummaryCmd() *cobra.Command {
 							monthSec += t.TotalSeconds
 							if t.CreatedAt.Day() == now.Day() {
 								daySec += t.TotalSeconds
+								if _, ok := todayTasks[t.ID]; !ok {
+									todayTasks[t.ID] = &dailyTaskStats{task: t, seconds: 0}
+								}
+								todayTasks[t.ID].seconds += t.TotalSeconds
 							}
 						}
 						if !t.CreatedAt.Before(startOfWeek) && t.CreatedAt.Before(endOfWeek) {
@@ -93,6 +90,24 @@ func newSummaryCmd() *cobra.Command {
 			fmt.Printf("This Week:  %.2f hours\n", float64(weekSec)/3600.0)
 			fmt.Printf("This Month: %.2f hours\n", float64(monthSec)/3600.0)
 			fmt.Printf("This Year:  %.2f hours\n", float64(yearSec)/3600.0)
+
+			if len(todayTasks) > 0 {
+				fmt.Println("\n==== Today's Breakdown ====")
+				for _, stat := range todayTasks {
+					adoInfo := ""
+					if stat.task.ADOID != nil {
+						adoInfo = fmt.Sprintf("[ADO-%d]", *stat.task.ADOID)
+					}
+					
+					typ := stat.task.ADOType
+					if typ == "" {
+						typ = "Task"
+					}
+					
+					// Format: [20261002.001] [ADO-12345]   (Story)             Fix the firewall rules                   : 2.00 hours
+					fmt.Printf("[%s] %-13s (%-17s) %-40s : %.2f hours\n", stat.task.ID, adoInfo, typ, stat.task.Title, float64(stat.seconds)/3600.0)
+				}
+			}
 
 			return nil
 		},
